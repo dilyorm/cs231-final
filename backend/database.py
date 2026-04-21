@@ -1,6 +1,7 @@
 import sqlite3
 import json
 import os
+import uuid
 from typing import Optional, List
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "exam.db")
@@ -37,19 +38,29 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    # Migrate existing questions table if status column missing
-    try:
-        conn.execute("ALTER TABLE questions ADD COLUMN status TEXT NOT NULL DEFAULT 'approved'")
-    except Exception:
-        pass
-    try:
-        conn.execute("ALTER TABLE questions ADD COLUMN created_by INTEGER REFERENCES users(id)")
-    except Exception:
-        pass
-    try:
-        conn.execute("ALTER TABLE questions ADD COLUMN ai_feedback TEXT")
-    except Exception:
-        pass
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS exam_sessions (
+            id TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            status TEXT NOT NULL DEFAULT 'in_progress',
+            questions TEXT NOT NULL,
+            answers TEXT NOT NULL DEFAULT '[]',
+            current_q_index INTEGER NOT NULL DEFAULT 0,
+            final_score REAL,
+            started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            completed_at TIMESTAMP
+        )
+    """)
+    # Migrate questions table
+    for col in [
+        "ALTER TABLE questions ADD COLUMN status TEXT NOT NULL DEFAULT 'approved'",
+        "ALTER TABLE questions ADD COLUMN created_by INTEGER REFERENCES users(id)",
+        "ALTER TABLE questions ADD COLUMN ai_feedback TEXT",
+    ]:
+        try:
+            conn.execute(col)
+        except Exception:
+            pass
     conn.commit()
     conn.close()
 
@@ -175,13 +186,8 @@ def update(q_id: str, data: dict, status: Optional[str] = None) -> Optional[dict
                SET topic_number=?, topic=?, question=?, followups=?, code_challenge=?, status=?
                WHERE id=?""",
             (
-                data["topic_number"],
-                data["topic"],
-                data["question"],
-                json.dumps(data["followups"]),
-                data.get("code_challenge"),
-                status,
-                q_id,
+                data["topic_number"], data["topic"], data["question"],
+                json.dumps(data["followups"]), data.get("code_challenge"), status, q_id,
             ),
         )
     else:
@@ -190,12 +196,8 @@ def update(q_id: str, data: dict, status: Optional[str] = None) -> Optional[dict
                SET topic_number=?, topic=?, question=?, followups=?, code_challenge=?
                WHERE id=?""",
             (
-                data["topic_number"],
-                data["topic"],
-                data["question"],
-                json.dumps(data["followups"]),
-                data.get("code_challenge"),
-                q_id,
+                data["topic_number"], data["topic"], data["question"],
+                json.dumps(data["followups"]), data.get("code_challenge"), q_id,
             ),
         )
     conn.commit()
@@ -207,10 +209,7 @@ def update(q_id: str, data: dict, status: Optional[str] = None) -> Optional[dict
 def update_status(q_id: str, status: str, ai_feedback: Optional[str] = None) -> Optional[dict]:
     conn = get_conn()
     if ai_feedback is not None:
-        conn.execute(
-            "UPDATE questions SET status=?, ai_feedback=? WHERE id=?",
-            (status, ai_feedback, q_id),
-        )
+        conn.execute("UPDATE questions SET status=?, ai_feedback=? WHERE id=?", (status, ai_feedback, q_id))
     else:
         conn.execute("UPDATE questions SET status=? WHERE id=?", (status, q_id))
     conn.commit()
@@ -241,10 +240,8 @@ def stats() -> dict:
     total = conn.execute("SELECT COUNT(*) FROM questions WHERE status = 'approved'").fetchone()[0]
     topics = conn.execute(
         """SELECT topic_number, topic, COUNT(*) as count
-           FROM questions
-           WHERE status = 'approved'
-           GROUP BY topic_number
-           ORDER BY topic_number"""
+           FROM questions WHERE status = 'approved'
+           GROUP BY topic_number ORDER BY topic_number"""
     ).fetchall()
     conn.close()
     return {"total_questions": total, "topics": [dict(t) for t in topics]}
@@ -254,8 +251,7 @@ def next_id_for_topic(topic_number: int) -> str:
     conn = get_conn()
     prefix = f"T{topic_number:02d}-"
     rows = conn.execute(
-        "SELECT id FROM questions WHERE id LIKE ? ORDER BY id",
-        (prefix + "%",),
+        "SELECT id FROM questions WHERE id LIKE ? ORDER BY id", (prefix + "%",)
     ).fetchall()
     conn.close()
     if not rows:
@@ -267,3 +263,139 @@ def next_id_for_topic(topic_number: int) -> str:
         except (IndexError, ValueError):
             pass
     return f"{prefix}{max(nums) + 1 if nums else 1}"
+
+
+# ── Exam Sessions ──────────────────────────────────────────────────────────
+
+def _session_row(row) -> dict:
+    d = dict(row)
+    d["questions"] = json.loads(d["questions"])
+    d["answers"] = json.loads(d["answers"])
+    return d
+
+
+def create_session(user_id: int, questions: List[dict]) -> dict:
+    conn = get_conn()
+    session_id = str(uuid.uuid4())
+    conn.execute(
+        "INSERT INTO exam_sessions (id, user_id, questions, answers, current_q_index) VALUES (?, ?, ?, '[]', 0)",
+        (session_id, user_id, json.dumps(questions)),
+    )
+    conn.commit()
+    row = conn.execute("SELECT * FROM exam_sessions WHERE id = ?", (session_id,)).fetchone()
+    conn.close()
+    return _session_row(row)
+
+
+def get_session(session_id: str) -> Optional[dict]:
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM exam_sessions WHERE id = ?", (session_id,)).fetchone()
+    conn.close()
+    return _session_row(row) if row else None
+
+
+def get_user_active_session(user_id: int) -> Optional[dict]:
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT * FROM exam_sessions WHERE user_id = ? AND status = 'in_progress' ORDER BY started_at DESC LIMIT 1",
+        (user_id,),
+    ).fetchone()
+    conn.close()
+    return _session_row(row) if row else None
+
+
+def save_session_answer(session_id: str, q_index: int, answer_type: str, answer: str, followup_index: Optional[int] = None) -> dict:
+    """Save one answer (main or followup) into the answers array."""
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM exam_sessions WHERE id = ?", (session_id,)).fetchone()
+    if not row:
+        conn.close()
+        raise ValueError("Session not found")
+    session = _session_row(row)
+    answers: list = session["answers"]
+
+    # Ensure slot exists
+    while len(answers) <= q_index:
+        answers.append({"q_index": len(answers), "main_answer": None, "followup_answers": [], "evaluation": None, "overall_score": None})
+
+    if answer_type == "main":
+        answers[q_index]["main_answer"] = answer
+    elif answer_type == "followup" and followup_index is not None:
+        fa = answers[q_index]["followup_answers"]
+        while len(fa) <= followup_index:
+            fa.append(None)
+        fa[followup_index] = answer
+        answers[q_index]["followup_answers"] = fa
+
+    conn.execute(
+        "UPDATE exam_sessions SET answers = ? WHERE id = ?",
+        (json.dumps(answers), session_id),
+    )
+    conn.commit()
+    row = conn.execute("SELECT * FROM exam_sessions WHERE id = ?", (session_id,)).fetchone()
+    conn.close()
+    return _session_row(row)
+
+
+def save_question_evaluation(session_id: str, q_index: int, evaluation: dict, overall_score: float, next_q_index: int) -> dict:
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM exam_sessions WHERE id = ?", (session_id,)).fetchone()
+    if not row:
+        conn.close()
+        raise ValueError("Session not found")
+    session = _session_row(row)
+    answers = session["answers"]
+
+    while len(answers) <= q_index:
+        answers.append({"q_index": len(answers), "main_answer": None, "followup_answers": [], "evaluation": None, "overall_score": None})
+
+    answers[q_index]["evaluation"] = evaluation
+    answers[q_index]["overall_score"] = overall_score
+
+    conn.execute(
+        "UPDATE exam_sessions SET answers = ?, current_q_index = ? WHERE id = ?",
+        (json.dumps(answers), next_q_index, session_id),
+    )
+    conn.commit()
+    row = conn.execute("SELECT * FROM exam_sessions WHERE id = ?", (session_id,)).fetchone()
+    conn.close()
+    return _session_row(row)
+
+
+def complete_session(session_id: str) -> dict:
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM exam_sessions WHERE id = ?", (session_id,)).fetchone()
+    if not row:
+        conn.close()
+        raise ValueError("Session not found")
+    session = _session_row(row)
+    scores = [a["overall_score"] for a in session["answers"] if a.get("overall_score") is not None]
+    final_score = sum(scores) / len(scores) if scores else 0.0
+    conn.execute(
+        "UPDATE exam_sessions SET status = 'completed', final_score = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?",
+        (final_score, session_id),
+    )
+    conn.commit()
+    row = conn.execute("SELECT * FROM exam_sessions WHERE id = ?", (session_id,)).fetchone()
+    conn.close()
+    return _session_row(row)
+
+
+def list_user_sessions(user_id: int) -> List[dict]:
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM exam_sessions WHERE user_id = ? ORDER BY started_at DESC",
+        (user_id,),
+    ).fetchall()
+    conn.close()
+    return [_session_row(r) for r in rows]
+
+
+def abandon_session(session_id: str) -> bool:
+    conn = get_conn()
+    r = conn.execute(
+        "UPDATE exam_sessions SET status = 'abandoned' WHERE id = ?", (session_id,)
+    )
+    conn.commit()
+    conn.close()
+    return r.rowcount > 0

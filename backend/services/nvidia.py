@@ -63,74 +63,86 @@ Respond ONLY in this exact JSON (no text before or after):
   "gaps": "<specific concepts missing, shallow, or incorrect — or 'None' if perfect>",
   "model_answer": "<3-4 sentence comprehensive ideal answer covering all key points>",
   "improvement_tips": "<2-3 concrete, actionable tips the student should do to give a better answer next time>"
+}"""
+
+FULL_EVAL_SYSTEM = """You are a strict Computer Architecture oral exam evaluator.
+The student answered a main question AND its follow-up questions. Evaluate the COMPLETE performance.
+
+Respond ONLY in this exact JSON (no text before or after):
+{
+  "overall_score": <integer 0-100>,
+  "grade": "<A+ | A | B | C | D | F>",
+  "items": [
+    {"label": "<Main Question | Follow-up 1 | Follow-up 2 | ...>", "score": <0-100>, "feedback": "<1 sentence specific feedback>"}
+  ],
+  "strengths": "<key correct concepts demonstrated across all answers>",
+  "gaps": "<key concepts missing or wrong across all answers, or 'None'>",
+  "model_answer": "<ideal comprehensive answer to the main question in 3-4 sentences>",
+  "improvement_tips": "<2-3 actionable tips for improvement>"
 }
 
-Scoring guide:
-- 90-100: Complete, precise, with depth and examples
-- 70-89: Mostly correct, minor gaps
-- 50-69: Core idea present but significant gaps
-- 30-49: Partial understanding, major errors
-- 0-29: Fundamentally wrong or very minimal"""
+Scoring: overall_score = weighted average (main question = 40%, each followup = split remaining 60%)."""
 
 DYNAMIC_FOLLOWUPS_SYSTEM = """You are a Computer Architecture oral examiner.
-The student just answered a question. Generate exactly 3 targeted follow-up questions based on their specific answer.
-
-Rules:
-- If answer was good: probe deeper, ask for edge cases or implementation details
-- If answer had gaps: target exactly those gaps
-- If answer was wrong: guide toward correct concepts
-- Make questions progressively harder
-- Each question must be a complete sentence ending with ?
-
-Return ONLY a JSON array of 3 strings, no other text:
+Generate exactly 3 targeted follow-up questions based on the student's answer.
+Return ONLY a JSON array of 3 strings:
 ["question 1?", "question 2?", "question 3?"]"""
 
 HINT_SYSTEM = """You are a Computer Architecture tutor giving a Socratic hint.
 Give 1-2 sentences that guide the student toward the answer without revealing it.
-Think about what concept they might be missing and nudge them.
 Return only the hint text, no preamble."""
 
 GENERATE_SYSTEM = """You are a Computer Architecture professor creating challenging exam questions.
-Generate a new exam question for the given topic.
-Respond ONLY in this exact JSON (no text before or after):
+Respond ONLY in this exact JSON:
 {
-  "question": "<challenging exam question — specific, not vague>",
+  "question": "<challenging exam question>",
   "followups": ["<followup 1>", "<followup 2>", "<followup 3>"],
-  "code_challenge": "<optional NASM/C/pseudocode task as a string, or null>"
+  "code_challenge": "<NASM/C task or null>"
 }"""
 
-VALIDATE_SYSTEM = """You are a strict quality reviewer for a CS231 Computer Architecture exam question bank.
+VALIDATE_SYSTEM = """You are a quality reviewer for a CS231 Computer Architecture exam question bank.
+Evaluate whether the question is: relevant to Computer Architecture, factually accurate, clear, and educational.
 
-Evaluate whether the submitted question meets ALL of these criteria:
-1. RELEVANT: Directly related to Computer Architecture topics (binary, assembly, memory, processors, etc.)
-2. ACCURATE: Contains no factually incorrect information or misleading statements
-3. CLEAR: Question is unambiguous and well-formed
-4. EDUCATIONAL: Tests genuine understanding, not trivia
-
-Respond ONLY in this exact JSON (no text before or after):
+Respond ONLY in this exact JSON:
 {
   "approved": <true or false>,
-  "reason": "<1-2 sentences explaining the decision>",
-  "issues": "<specific problems found, or 'None' if approved>",
-  "suggestions": "<how to improve the question, or 'None' if approved>"
+  "reason": "<1-2 sentences>",
+  "issues": "<specific problems or 'None'>",
+  "suggestions": "<how to improve or 'None'>"
 }"""
 
 
 def evaluate_answer(question: str, answer: str, topic: str) -> dict:
-    prompt = f"Topic: {topic}\n\nQuestion asked: {question}\n\nStudent's answer: {answer}"
+    prompt = f"Topic: {topic}\n\nQuestion: {question}\n\nStudent's answer: {answer}"
     raw = chat(EVAL_SYSTEM, prompt, max_tokens=600)
     result = _extract_json(raw)
     result["score"] = max(0, min(100, int(result.get("score", 0))))
     return result
 
 
+def evaluate_question_full(
+    topic: str,
+    main_question: str,
+    main_answer: str,
+    followups: list[str],
+    followup_answers: list[str],
+) -> dict:
+    """Evaluate all answers for one question block and return single score."""
+    lines = [f"Topic: {topic}", "", f"Main Question: {main_question}", f"Main Answer: {main_answer}"]
+    for i, (fq, fa) in enumerate(zip(followups, followup_answers)):
+        lines.append(f"\nFollow-up {i+1}: {fq}")
+        lines.append(f"Answer: {fa if fa else '(no answer given)'}")
+    prompt = "\n".join(lines)
+    raw = chat(FULL_EVAL_SYSTEM, prompt, max_tokens=800)
+    result = _extract_json(raw)
+    result["overall_score"] = max(0, min(100, int(result.get("overall_score", 0))))
+    for item in result.get("items", []):
+        item["score"] = max(0, min(100, int(item.get("score", 0))))
+    return result
+
+
 def generate_dynamic_followups(question: str, answer: str, topic: str) -> list[str]:
-    prompt = (
-        f"Topic: {topic}\n"
-        f"Original question: {question}\n"
-        f"Student's answer: {answer}\n\n"
-        "Generate 3 targeted follow-up questions."
-    )
+    prompt = f"Topic: {topic}\nOriginal question: {question}\nStudent's answer: {answer}\nGenerate 3 follow-up questions."
     raw = chat(DYNAMIC_FOLLOWUPS_SYSTEM, prompt, max_tokens=300)
     result = _extract_json(raw)
     if isinstance(result, list):
@@ -150,12 +162,7 @@ def generate_question(topic_number: int, topic: str) -> dict:
 
 
 def validate_question(topic: str, question: str, followups: list[str], code_challenge: str | None) -> dict:
-    followups_text = "\n".join(f"  - {f}" for f in followups) if followups else "  (none)"
-    prompt = (
-        f"Topic: {topic}\n\n"
-        f"Question: {question}\n\n"
-        f"Follow-up questions:\n{followups_text}\n\n"
-        f"Code challenge: {code_challenge or 'None'}"
-    )
+    followups_text = "\n".join(f"  - {f}" for f in followups)
+    prompt = f"Topic: {topic}\n\nQuestion: {question}\n\nFollow-ups:\n{followups_text}\n\nCode challenge: {code_challenge or 'None'}"
     raw = chat(VALIDATE_SYSTEM, prompt, max_tokens=400)
     return _extract_json(raw)

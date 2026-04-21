@@ -11,12 +11,6 @@ export interface Question {
   created_at: string;
 }
 
-export interface ExamSession {
-  student_name: string;
-  prep_questions: Question[];
-  direct_questions: Question[];
-}
-
 export interface TopicSummary {
   topic_number: number;
   topic: string;
@@ -31,6 +25,22 @@ export interface StatsResponse {
 export interface AIEvaluation {
   score: number;
   grade: string;
+  strengths: string;
+  gaps: string;
+  model_answer: string;
+  improvement_tips: string;
+}
+
+export interface FullEvalItem {
+  label: string;
+  score: number;
+  feedback: string;
+}
+
+export interface FullEvaluation {
+  overall_score: number;
+  grade: string;
+  items: FullEvalItem[];
   strengths: string;
   gaps: string;
   model_answer: string;
@@ -57,7 +67,33 @@ export interface User {
   created_at: string;
 }
 
-export interface AuthState {
-  user: User | null;
-  token: string | null;
+// Exam session types
+export interface QuestionAnswer {
+  q_index: number;
+  main_answer: string | null;
+  followup_answers: (string | null)[];
+  evaluation: FullEvaluation | null;
+  overall_score: number | null;
+}
+
+export interface ExamSession {
+  session_id: string;
+  questions: Question[];
+  prep_count: number;
+  current_q_index: number;
+  answers: QuestionAnswer[];
+  status: string;
+  final_score?: number | null;
+  started_at?: string;
+  completed_at?: string | null;
+}
+
+export interface SessionSummary {
+  id: string;
+  status: string;
+  final_score: number | null;
+  question_count: number;
+  answers_count: number;
+  started_at: string;
+  completed_at: string | null;
 }

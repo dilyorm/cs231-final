@@ -4,6 +4,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Home from "./pages/Home";
 import ExamPage from "./pages/ExamPage";
 import LoginPage from "./pages/LoginPage";
+import HistoryPage from "./pages/HistoryPage";
 import AdminLayout from "./pages/admin/AdminLayout";
 import Dashboard from "./pages/admin/Dashboard";
 import QuestionList from "./pages/admin/QuestionList";
@@ -17,8 +18,9 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/exam" element={<ExamPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/exam" element={<ExamPage />} />
+          <Route path="/history" element={<HistoryPage />} />
           <Route
             path="/admin"
             element={
