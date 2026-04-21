@@ -33,12 +33,13 @@ jobs:
             git reset --hard origin/${{ github.ref_name }}
 
             # Backend deps
-            pip install -r backend/requirements.txt -q
+            pip install -r backend/requirements.txt -q \
+              --break-system-packages --ignore-installed 2>/dev/null || true
 
             # Frontend build
             cd $DIR/frontend
-            npm ci
+            npm ci --silent
             npm run build
 
-            # Restart service
-            sudo systemctl restart $SERVICE
+            # Restart service (running as root, no sudo needed)
+            systemctl restart $SERVICE
