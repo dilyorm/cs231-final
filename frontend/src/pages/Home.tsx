@@ -65,6 +65,21 @@ export default function Home() {
             then <span className="text-red-400 font-medium">3 direct questions</span>. Answer follow-ups, then see your score.
           </p>
 
+          {/* Study CTA — visible to everyone */}
+          <button
+            onClick={() => navigate("/study")}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 hover:border-emerald-500/60 transition-all mb-4 text-left group"
+          >
+            <div className="w-9 h-9 rounded-lg bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+              <BookOpen className="w-5 h-5 text-emerald-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold text-emerald-300">Study Topics First</div>
+              <div className="text-xs text-slate-500">23 topics with key concepts, examples & exam traps</div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-emerald-600 group-hover:text-emerald-400 transition-colors flex-shrink-0" />
+          </button>
+
           {!user ? (
             /* Not logged in */
             <div className="space-y-4">
