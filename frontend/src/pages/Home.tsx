@@ -169,7 +169,26 @@ export default function Home() {
         </div>
       </main>
 
-      <footer className="text-center text-slate-700 text-xs py-4">CS231 · Computer Architecture · Spring 2026</footer>
+      <footer className="text-center text-slate-700 text-xs py-4 space-y-1">
+        <div>CS231 · Computer Architecture · Spring 2026</div>
+        <div className="flex items-center justify-center gap-4">
+          <a
+            href="https://t.me/dilyor_m"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-slate-600 hover:text-indigo-400 transition-colors"
+          >
+            Telegram: @dilyor_m
+          </a>
+          <span className="text-slate-800">·</span>
+          <a
+            href="mailto:d.muhammadjonov@newuu.uz"
+            className="text-slate-600 hover:text-indigo-400 transition-colors"
+          >
+            d.muhammadjonov@newuu.uz
+          </a>
+        </div>
+      </footer>
     </div>
   );
 }
