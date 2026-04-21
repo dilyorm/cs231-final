@@ -1,5 +1,6 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer
 from typing import Optional, List
+from datetime import datetime
 
 
 class QuestionBase(BaseModel):
@@ -23,7 +24,7 @@ class Question(QuestionBase):
     status: str = "approved"
     created_by: Optional[int] = None
     ai_feedback: Optional[str] = None
-    created_at: str
+    created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 
@@ -64,7 +65,7 @@ class UserResponse(BaseModel):
     id: int
     username: str
     role: str
-    created_at: str
+    created_at: Optional[datetime] = None
 
 
 class AuthResponse(BaseModel):
