@@ -11,6 +11,7 @@ import QuestionList from "./pages/admin/QuestionList";
 import QuestionForm from "./pages/admin/QuestionForm";
 import UsersPage from "./pages/admin/UsersPage";
 import ImportPage from "./pages/admin/ImportPage";
+import StudyPage from "./pages/StudyPage";
 
 export default function App() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/exam" element={<ExamPage />} />
           <Route path="/history" element={<HistoryPage />} />
+          <Route path="/study" element={<StudyPage />} />
           <Route
             path="/admin"
             element={

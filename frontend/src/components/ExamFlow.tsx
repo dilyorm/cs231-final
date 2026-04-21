@@ -387,8 +387,8 @@ export default function ExamFlow({ session: initialSession, verbalMode, onDone }
         </div>
       )}
 
-      <main className="flex-1 flex justify-center px-4 py-6 overflow-y-auto">
-        <div className="w-full max-w-2xl space-y-5">
+      <main className="flex-1 flex justify-center px-3 sm:px-4 py-4 sm:py-6 overflow-y-auto">
+        <div className="w-full max-w-2xl space-y-4 sm:space-y-5">
 
           {/* Meta */}
           <div className="flex items-center justify-between">
@@ -408,32 +408,34 @@ export default function ExamFlow({ session: initialSession, verbalMode, onDone }
           </div>
 
           {/* Progress within question */}
-          <div className="flex items-center gap-2">
-            {["Main Question", ...followups.map((_, i) => `Follow-up ${i + 1}`)].map((label, i) => {
-              const stepPhase: QPhase = i === 0 ? "main" : `followup_${i - 1}`;
-              const isDone = (i === 0 && qPhase !== "main") || (i > 0 && (qPhase === "scoring" || (qPhase.startsWith("followup_") && parseInt(qPhase.split("_")[1]) > i - 1)));
-              const isCurrent = stepPhase === qPhase || (isScoring && i === followups.length);
-              return (
-                <div key={i} className="flex items-center gap-1">
-                  {i > 0 && <div className={`h-px w-4 ${isDone ? "bg-indigo-500" : "bg-slate-700"}`} />}
-                  <div className={`w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center flex-shrink-0 ${isDone ? "bg-indigo-600 text-white" : isCurrent ? "bg-slate-700 border border-indigo-500 text-indigo-400" : "bg-slate-800 text-slate-600"}`}>
-                    {isDone ? <CheckCircle2 className="w-3 h-3" /> : i + 1}
+          <div className="overflow-x-auto pb-1">
+            <div className="flex items-center gap-1.5 min-w-max">
+              {["Main", ...followups.map((_, i) => `FU${i + 1}`)].map((label, i) => {
+                const stepPhase: QPhase = i === 0 ? "main" : `followup_${i - 1}`;
+                const isDone = (i === 0 && qPhase !== "main") || (i > 0 && (qPhase === "scoring" || (qPhase.startsWith("followup_") && parseInt(qPhase.split("_")[1]) > i - 1)));
+                const isCurrent = stepPhase === qPhase || (isScoring && i === followups.length);
+                return (
+                  <div key={i} className="flex items-center gap-1">
+                    {i > 0 && <div className={`h-px w-3 ${isDone ? "bg-indigo-500" : "bg-slate-700"}`} />}
+                    <div title={i === 0 ? "Main Question" : `Follow-up ${i}`} className={`w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center flex-shrink-0 ${isDone ? "bg-indigo-600 text-white" : isCurrent ? "bg-slate-700 border border-indigo-500 text-indigo-400" : "bg-slate-800 text-slate-600"}`}>
+                      {isDone ? <CheckCircle2 className="w-3 h-3" /> : i + 1}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-            {followups.length > 0 && (
-              <>
-                <div className={`h-px w-4 ${isScoring ? "bg-indigo-500" : "bg-slate-700"}`} />
-                <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${isScoring ? "bg-green-600" : "bg-slate-800"}`}>
-                  <Star className="w-3 h-3 text-white" />
-                </div>
-              </>
-            )}
+                );
+              })}
+              {followups.length > 0 && (
+                <>
+                  <div className={`h-px w-3 ${isScoring ? "bg-indigo-500" : "bg-slate-700"}`} />
+                  <div title="Score" className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${isScoring ? "bg-green-600" : "bg-slate-800"}`}>
+                    <Star className="w-3 h-3 text-white" />
+                  </div>
+                </>
+              )}
+            </div>
           </div>
 
           {/* Main question card */}
-          <div className={`bg-slate-900 border rounded-2xl p-6 ${qPhase !== "main" ? "border-slate-700/50 opacity-80" : "border-slate-700"}`}>
+          <div className={`bg-slate-900 border rounded-2xl p-4 sm:p-6 ${qPhase !== "main" ? "border-slate-700/50 opacity-80" : "border-slate-700"}`}>
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <div className="text-xs text-slate-500 font-semibold mb-2 uppercase tracking-wide">Main Question</div>
@@ -719,7 +721,7 @@ function Header({ isPrep, timer, verbalMode, tts, qIdx, total }: {
   verbalMode: boolean; tts: ReturnType<typeof useTTS>; qIdx: number; total: number;
 }) {
   return (
-    <header className="border-b border-slate-800 px-5 py-3 flex items-center justify-between flex-shrink-0">
+    <header className="border-b border-slate-800 px-3 sm:px-5 py-3 flex items-center justify-between flex-shrink-0 gap-2">
       <div className="flex items-center gap-2">
         <span className={`text-xs font-semibold ${isPrep ? "text-amber-400" : "text-red-400"}`}>{isPrep ? "Preparation" : "Direct"}</span>
         <span className="text-slate-700">·</span>

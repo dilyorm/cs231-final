@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { BookOpen, Shield, ChevronRight, Cpu, Settings, Mic, MicOff, Volume2, LogIn, History, RotateCcw } from "lucide-react";
+import { BookOpen, Shield, ChevronRight, Cpu, Settings, Mic, MicOff, Volume2, LogIn, History, RotateCcw, GraduationCap } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
 export default function Home() {
@@ -16,25 +16,28 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col">
       {/* Header */}
-      <header className="border-b border-slate-800 px-6 py-4 flex items-center justify-between">
+      <header className="border-b border-slate-800 px-4 sm:px-6 py-4 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Cpu className="w-5 h-5 text-indigo-400" />
           <span className="font-semibold text-slate-300 text-sm tracking-wide">CS231 · Computer Architecture</span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-shrink-0">
           {user ? (
             <>
               {(isAdmin || isContributor) && (
-                <button onClick={() => navigate("/admin")} className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors">
-                  <Settings className="w-3.5 h-3.5" /> Panel
+                <button onClick={() => navigate("/admin")} className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors">
+                  <Settings className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Panel</span>
                 </button>
               )}
-              <button onClick={() => navigate("/history")} className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors">
-                <History className="w-3.5 h-3.5" /> History
+              <button onClick={() => navigate("/study")} className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors">
+                <GraduationCap className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Study</span>
               </button>
-              <span className="text-xs text-slate-600">|</span>
-              <span className="text-xs text-slate-400">{user.username}</span>
-              <button onClick={logout} className="text-xs text-slate-600 hover:text-slate-400 transition-colors">Sign out</button>
+              <button onClick={() => navigate("/history")} className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors">
+                <History className="w-3.5 h-3.5" /> <span className="hidden sm:inline">History</span>
+              </button>
+              <span className="text-xs text-slate-600 hidden sm:inline">|</span>
+              <span className="text-xs text-slate-400 hidden sm:inline truncate max-w-[80px]">{user.username}</span>
+              <button onClick={logout} className="text-xs text-slate-600 hover:text-slate-400 transition-colors">Out</button>
             </>
           ) : (
             <button onClick={() => navigate("/login")} className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors">
@@ -44,7 +47,7 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="flex-1 flex items-center justify-center px-4">
+      <main className="flex-1 flex items-center justify-center px-3 sm:px-4">
         <div className="w-full max-w-lg">
           {/* Badge */}
           <div className="flex justify-center mb-8">
@@ -132,7 +135,7 @@ export default function Home() {
           )}
 
           {/* Info cards */}
-          <div className="mt-10 grid grid-cols-4 gap-2.5">
+          <div className="mt-10 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             {[
               { icon: BookOpen, label: "23 Topics", sub: "All covered" },
               { icon: Shield, label: "95 Questions", sub: "Full bank" },

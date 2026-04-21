@@ -49,15 +49,15 @@ export default function HistoryPage() {
 
     return (
       <div className="min-h-screen bg-slate-950 text-white">
-        <header className="border-b border-slate-800 px-6 py-4 flex items-center gap-4">
-          <button onClick={() => setDetail(null)} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors">
+        <header className="border-b border-slate-800 px-4 sm:px-6 py-4 flex items-center gap-3">
+          <button onClick={() => setDetail(null)} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors flex-shrink-0">
             <ArrowLeft className="w-4 h-4" />
           </button>
-          <div>
+          <div className="flex-1 min-w-0">
             <h1 className="font-bold text-white">Exam Detail</h1>
             <p className="text-xs text-slate-500">{new Date(detail.started_at ?? "").toLocaleString()}</p>
           </div>
-          <div className={`ml-auto text-3xl font-black ${scoreColor(avg)}`}>{avg}<span className="text-lg text-slate-500">/100</span></div>
+          <div className={`text-2xl sm:text-3xl font-black flex-shrink-0 ${scoreColor(avg)}`}>{avg}<span className="text-base sm:text-lg text-slate-500">/100</span></div>
         </header>
 
         <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
@@ -128,23 +128,25 @@ export default function HistoryPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
-      <header className="border-b border-slate-800 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate("/")} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors">
+      <header className="border-b border-slate-800 px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <button onClick={() => navigate("/")} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors flex-shrink-0">
             <ArrowLeft className="w-4 h-4" />
           </button>
-          <div>
-            <h1 className="font-bold text-white">Exam History</h1>
-            <p className="text-xs text-slate-500">{user?.username}</p>
+          <div className="min-w-0">
+            <h1 className="font-bold text-white truncate">Exam History</h1>
+            <p className="text-xs text-slate-500 truncate">{user?.username}</p>
           </div>
         </div>
         <button onClick={() => navigate("/exam")}
-          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
-          New Exam <ChevronRight className="w-3.5 h-3.5" />
+          className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold px-3 sm:px-4 py-2 rounded-lg transition-colors flex-shrink-0">
+          <span className="hidden sm:inline">New Exam</span>
+          <span className="sm:hidden">New</span>
+          <ChevronRight className="w-3.5 h-3.5" />
         </button>
       </header>
 
-      <div className="max-w-2xl mx-auto px-4 py-8">
+      <div className="max-w-2xl mx-auto px-3 sm:px-4 py-6 sm:py-8">
         {loading ? (
           <div className="text-center py-16 text-slate-500">Loading...</div>
         ) : sessions.length === 0 ? (
@@ -186,7 +188,7 @@ export default function HistoryPage() {
               return (
                 <div key={s.id}
                   onClick={() => s.status !== "abandoned" && openDetail(s.id)}
-                  className={`bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center gap-4 ${s.status !== "abandoned" ? "cursor-pointer hover:border-slate-600 transition-colors" : "opacity-50"}`}>
+                  className={`bg-slate-900 border border-slate-800 rounded-xl p-3 sm:p-4 flex items-center gap-3 sm:gap-4 ${s.status !== "abandoned" ? "cursor-pointer hover:border-slate-600 transition-colors" : "opacity-50"}`}>
                   <div className={`w-10 h-10 rounded-xl ${st.cls} flex items-center justify-center flex-shrink-0`}>
                     <StatusIcon className="w-5 h-5" />
                   </div>
