@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   PenLine,
   Eye,
+  Upload,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -36,6 +37,7 @@ export default function AdminLayout() {
     { to: "/admin/questions", label: "Questions", icon: List, end: false, show: true },
     { to: "/admin/questions/new", label: "Add Question", icon: PlusCircle, end: true, show: true },
     { to: "/admin/users", label: "Users", icon: Users, end: true, show: isAdmin },
+    { to: "/admin/import", label: "Import", icon: Upload, end: true, show: isAdmin },
   ];
 
   return (

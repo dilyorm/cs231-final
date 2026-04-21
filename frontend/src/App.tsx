@@ -9,6 +9,7 @@ import Dashboard from "./pages/admin/Dashboard";
 import QuestionList from "./pages/admin/QuestionList";
 import QuestionForm from "./pages/admin/QuestionForm";
 import UsersPage from "./pages/admin/UsersPage";
+import ImportPage from "./pages/admin/ImportPage";
 
 export default function App() {
   return (
@@ -31,6 +32,7 @@ export default function App() {
             <Route path="questions/new" element={<QuestionForm />} />
             <Route path="questions/:id/edit" element={<QuestionForm />} />
             <Route path="users" element={<UsersPage />} />
+            <Route path="import" element={<ImportPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
