@@ -39,7 +39,8 @@ def chat(system: str, user: str, max_tokens: int = 700) -> str:
 
 
 def _extract_json(raw: str) -> dict | list:
-    for start_char, end_char in [("[", "]"), ("{", "}")]:
+    # Try object first (most responses are objects), then array
+    for start_char, end_char in [("{", "}"), ("[", "]")]:
         s = raw.find(start_char)
         e = raw.rfind(end_char) + 1
         if s != -1 and e > 0:
