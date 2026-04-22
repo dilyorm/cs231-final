@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, BookOpen, ChevronRight, ChevronDown, Star, AlertTriangle, Sun, Moon, FileText, Download, ExternalLink } from "lucide-react";
+import { ArrowLeft, BookOpen, ChevronRight, ChevronDown, Star, AlertTriangle, Sun, Moon, FileText, Download, ExternalLink, PlayCircle } from "lucide-react";
 import { useTheme } from "../contexts/ThemeContext";
 
 type Block =
@@ -48,6 +48,44 @@ const SLIDES: Record<number, { label: string; file: string; pages?: string }[]> 
   21: [{ label: "Concurrent Programming & Parallelism", file: "topic21-22-concurrent.pdf", pages: "107 slides" }],
   22: [{ label: "Parallelism & Synchronization", file: "topic21-22-concurrent.pdf", pages: "107 slides" }],
   23: [{ label: "Virtual Machines", file: "topic23-vmachines.pdf", pages: "25 slides" }],
+};
+
+// CMU 15-213 (CS:APP) lecture videos — mapped per CS231 topic
+const VIDEOS: Record<number, { title: string; id: string }[]> = {
+  1:  [{ title: "Lecture 02 – Bits, Bytes & Integers", id: "ADonnz9fCCk" },
+       { title: "Lecture 03 – Bits, Bytes & Integers (cont.)", id: "GE3Yu8uGhWI" }],
+  2:  [{ title: "Lecture 02 – Bits, Bytes & Integers", id: "ADonnz9fCCk" },
+       { title: "Lecture 03 – Bits, Bytes & Integers (cont.)", id: "GE3Yu8uGhWI" }],
+  3:  [{ title: "Lecture 04 – Floating Point", id: "FbqtCS22lCE" }],
+  4:  [{ title: "Lecture 05 – Machine Level Programming I: Basics", id: "3gtuk5T0t_U" }],
+  5:  [{ title: "Lecture 05 – Machine Level Programming I: Basics", id: "3gtuk5T0t_U" },
+       { title: "Lecture 06 – Machine Level Programming II: Arithmetic & Control", id: "uJWql7IDmgQ" }],
+  6:  [{ title: "Lecture 06 – Machine Level Programming II: Arithmetic & Control", id: "uJWql7IDmgQ" },
+       { title: "Lecture 07 – Machine Level Programming III: Switch & IA32 Procedures", id: "VlQA2kwlRmQ" }],
+  7:  [{ title: "Lecture 07 – Machine Level Programming III: Switch & IA32 Procedures", id: "VlQA2kwlRmQ" },
+       { title: "Lecture 08 – Machine Level Programming IV: x86-64 Procedures & Data", id: "ZvsnWfpW00c" }],
+  8:  [{ title: "Lecture 09 – Machine Level Programming V: Advanced Topics", id: "dX8DhduJDic" }],
+  9:  [{ title: "Lecture 09 – Machine Level Programming V: Advanced Topics", id: "dX8DhduJDic" }],
+  10: [{ title: "Lecture 08 – Machine Level Programming IV: x86-64 Procedures & Data", id: "ZvsnWfpW00c" },
+       { title: "Lecture 09 – Machine Level Programming V: Advanced Topics", id: "dX8DhduJDic" }],
+  11: [{ title: "Lecture 09 – Machine Level Programming V: Advanced Topics", id: "dX8DhduJDic" }],
+  12: [{ title: "Lecture 10 – The Memory Hierarchy", id: "YaQ8rxPfot4" },
+       { title: "Lecture 11 – Cache Memories", id: "EGv1SEGV87c" }],
+  13: [{ title: "Lecture 10 – The Memory Hierarchy", id: "YaQ8rxPfot4" }],
+  14: [{ title: "Lecture 10 – The Memory Hierarchy", id: "YaQ8rxPfot4" }],
+  15: [{ title: "Lecture 12 – Linking", id: "_QGnnj7YzsY" }],
+  16: [{ title: "Lecture 13 – Exceptional Control Flow: Exceptions & Processes", id: "RhmlIkBPG4c" }],
+  17: [{ title: "Lecture 13 – Exceptional Control Flow: Exceptions & Processes", id: "RhmlIkBPG4c" },
+       { title: "Lecture 14 – Multitasking, Shells, Signals & Nonlocal Jumps", id: "JhCGAR7Snrs" }],
+  18: [{ title: "Lecture 14 – Multitasking, Shells, Signals & Nonlocal Jumps", id: "JhCGAR7Snrs" }],
+  19: [{ title: "Lecture 15 – System Level I/O", id: "_IPvwWLUNuo" }],
+  20: [{ title: "Lecture 16 – Virtual Memory: Concepts", id: "ee838q5qkvc" },
+       { title: "Lecture 17 – Virtual Memory: Systems", id: "N1V775Ne7kE" }],
+  21: [{ title: "Lecture 23 – Concurrent Programming", id: "MYBripdZmmo" }],
+  22: [{ title: "Lecture 24 – Synchronization: Basics", id: "Ku34SvC2ChM" },
+       { title: "Lecture 25 – Synchronization: Advanced", id: "w38STX7RaVg" },
+       { title: "Lecture 26 – Thread Level Parallelism", id: "z6_dHbj4H0w" }],
+  23: [],
 };
 
 function Block({ b, dot }: { b: Block; dot: string }) {
@@ -1784,14 +1822,19 @@ export default function StudyPage() {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [slideOpen, setSlideOpen] = useState(false);
   const [activeSlide, setActiveSlide] = useState<string | null>(null);
+  const [videoOpen, setVideoOpen] = useState(false);
+  const [activeVideo, setActiveVideo] = useState<string | null>(null);
   const topic = TOPICS[selected];
   const slides = SLIDES[topic.number] ?? [];
+  const videos = VIDEOS[topic.number] ?? [];
 
   function selectTopic(i: number) {
     setSelected(i);
     setOpen({});
     setSlideOpen(false);
     setActiveSlide(null);
+    setVideoOpen(false);
+    setActiveVideo(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -1909,6 +1952,62 @@ export default function StudyPage() {
                           className="w-full rounded-b-lg"
                           style={{ height: "70vh", minHeight: 400 }}
                           title={s.label}
+                        />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Lecture Videos section */}
+        {videos.length > 0 && (
+          <div className="mb-4 border border-red-200 dark:border-red-500/20 rounded-xl overflow-hidden bg-red-50 dark:bg-red-950/20">
+            <button
+              onClick={() => setVideoOpen(v => !v)}
+              className="w-full flex items-center justify-between px-4 py-3 text-left"
+            >
+              <div className="flex items-center gap-2.5">
+                <PlayCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0" />
+                <span className="font-semibold text-sm text-red-700 dark:text-red-300">CMU Lecture Videos</span>
+                <span className="text-xs text-red-500 bg-red-100 dark:bg-red-900/40 px-1.5 py-0.5 rounded-full">{videos.length}</span>
+              </div>
+              <ChevronDown className={`w-4 h-4 text-red-500 transition-transform duration-200 ${videoOpen ? "rotate-180" : ""}`} />
+            </button>
+            {videoOpen && (
+              <div className="px-4 pb-4 space-y-3">
+                {videos.map((v, vi) => (
+                  <div key={vi} className="border border-red-200 dark:border-red-700/40 rounded-lg overflow-hidden bg-white dark:bg-slate-900">
+                    <div className="flex items-center justify-between px-3 py-2.5 gap-2">
+                      <span className="text-sm font-medium text-gray-800 dark:text-slate-200 truncate">{v.title}</span>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <button
+                          onClick={() => setActiveVideo(activeVideo === v.id ? null : v.id)}
+                          className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200 px-2 py-1 rounded-md hover:bg-red-50 dark:hover:bg-red-900/40 transition-colors"
+                        >
+                          <PlayCircle className="w-3 h-3" />
+                          <span className="hidden sm:inline">{activeVideo === v.id ? "Close" : "Play"}</span>
+                        </button>
+                        <a
+                          href={`https://www.youtube.com/watch?v=${v.id}`}
+                          target="_blank" rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-xs text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 px-2 py-1 rounded-md hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          <span className="hidden sm:inline">YouTube</span>
+                        </a>
+                      </div>
+                    </div>
+                    {activeVideo === v.id && (
+                      <div className="border-t border-red-200 dark:border-red-700/40 aspect-video">
+                        <iframe
+                          src={`https://www.youtube.com/embed/${v.id}?autoplay=1`}
+                          className="w-full h-full"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                          title={v.title}
                         />
                       </div>
                     )}
