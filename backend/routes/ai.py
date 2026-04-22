@@ -1,6 +1,6 @@
 import base64
 import os
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
 from fastapi.responses import Response
 from pydantic import BaseModel
 from typing import Optional, List
@@ -115,6 +115,21 @@ def text_to_speech(body: TTSRequest):
             "audio_base64": base64.b64encode(wav_bytes).decode(),
             "mime_type": "audio/wav",
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/stt")
+async def speech_to_text(audio: UploadFile = File(...)):
+    """Transcribe audio using Gemini multimodal STT."""
+    if not _use_gemini():
+        raise HTTPException(status_code=503, detail="Gemini not configured — set GEMINI_API_KEY in .env")
+    try:
+        from services import gemini
+        audio_bytes = await audio.read()
+        mime_type = audio.content_type or "audio/webm"
+        transcript = gemini.transcribe(audio_bytes, mime_type)
+        return {"transcript": transcript}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

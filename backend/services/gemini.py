@@ -209,6 +209,33 @@ def generate_question(topic_number: int, topic: str) -> dict:
     return _extract_json(raw)
 
 
+def transcribe(audio_bytes: bytes, mime_type: str = "audio/webm") -> str:
+    """Transcribe audio using Gemini multimodal. Returns plain text transcript."""
+    api_key = _gemini_api_key()
+    model = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+
+    # Clean mime type (strip codec params for inline data)
+    clean_mime = mime_type.split(";")[0].strip()
+
+    payload = {
+        "contents": [{
+            "parts": [
+                {"text": "Transcribe the speech in this audio recording. Return only the spoken words exactly as heard, nothing else. If no speech, return empty string."},
+                {"inline_data": {"mime_type": clean_mime, "data": base64.b64encode(audio_bytes).decode()}},
+            ]
+        }],
+        "generationConfig": {"temperature": 0, "maxOutputTokens": 1000},
+    }
+
+    with httpx.Client(timeout=30) as client:
+        resp = client.post(url, json=payload)
+        resp.raise_for_status()
+        data = resp.json()
+
+    return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+
+
 def validate_question(topic: str, question: str, followups: list[str], code_challenge: str | None) -> dict:
     followups_text = "\n".join(f"  - {f}" for f in followups)
     prompt = f"Topic: {topic}\n\nQuestion: {question}\n\nFollow-ups:\n{followups_text}\n\nCode challenge: {code_challenge or 'None'}"

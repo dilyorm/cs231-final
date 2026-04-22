@@ -617,6 +617,7 @@ function AnswerInput({ value, onChange, verbalMode, stt, label }: {
   value: string; onChange: (v: string) => void;
   verbalMode: boolean; stt: ReturnType<typeof useSTT>; label: string;
 }) {
+  const busy = stt.recording || stt.transcribing;
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
@@ -628,25 +629,40 @@ function AnswerInput({ value, onChange, verbalMode, stt, label }: {
           value={value}
           onChange={e => onChange(e.target.value)}
           rows={5}
-          placeholder={verbalMode ? "Click mic or type..." : "Type your answer..."}
+          placeholder={verbalMode ? "Hold mic to record, or type..." : "Type your answer..."}
           className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 resize-none transition-colors pr-12"
         />
         {verbalMode && (
           <button
-            onClick={stt.listening ? stt.stop : stt.start}
-            disabled={!stt.supported}
-            className={`absolute right-3 bottom-3 p-2 rounded-lg transition-all ${stt.listening ? "bg-red-600 text-white animate-pulse" : stt.supported ? "bg-violet-600 hover:bg-violet-500 text-white" : "bg-slate-700 text-slate-500 cursor-not-allowed"}`}
+            onClick={stt.recording ? stt.stop : stt.start}
+            disabled={!stt.supported || stt.transcribing}
+            title={!stt.supported ? "Mic not supported" : stt.recording ? "Stop recording" : "Start recording"}
+            className={`absolute right-3 bottom-3 p-2 rounded-lg transition-all ${
+              stt.recording
+                ? "bg-red-600 text-white animate-pulse"
+                : stt.transcribing
+                ? "bg-amber-600 text-white"
+                : stt.supported
+                ? "bg-violet-600 hover:bg-violet-500 text-white"
+                : "bg-slate-700 text-slate-500 cursor-not-allowed"
+            }`}
           >
-            {stt.listening ? <StopCircle className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+            {stt.recording ? <StopCircle className="w-4 h-4" /> : stt.transcribing ? <Spin /> : <Mic className="w-4 h-4" />}
           </button>
         )}
       </div>
-      {stt.listening && (
-        <p className="text-xs text-red-400 mt-1 flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse inline-block" /> Listening...
+      {stt.recording && (
+        <p className="text-xs text-red-400 mt-1 flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse inline-block" />
+          Recording... click mic to stop
         </p>
       )}
-      {stt.error && !stt.listening && (
+      {stt.transcribing && (
+        <p className="text-xs text-amber-400 mt-1 flex items-center gap-1.5">
+          <Spin /> Transcribing with Gemini...
+        </p>
+      )}
+      {stt.error && !busy && (
         <p className="text-xs text-orange-400 mt-1">{stt.error}</p>
       )}
     </div>
