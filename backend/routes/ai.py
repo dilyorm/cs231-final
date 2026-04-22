@@ -1,10 +1,23 @@
+import base64
+import os
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import Response
 from pydantic import BaseModel
 from typing import Optional, List
 from services import nvidia
 import auth as a
 
 router = APIRouter(prefix="/ai", tags=["ai"])
+
+# Use Gemini if key is configured, else fall back to NVIDIA
+def _use_gemini() -> bool:
+    return bool(os.getenv("GEMINI_API_KEY", "").strip())
+
+def _ai():
+    if _use_gemini():
+        from services import gemini
+        return gemini
+    return nvidia
 
 
 class EvaluateRequest(BaseModel):
@@ -36,12 +49,17 @@ class ValidateQuestionRequest(BaseModel):
     code_challenge: Optional[str] = None
 
 
+class TTSRequest(BaseModel):
+    text: str
+    voice: Optional[str] = "Kore"
+
+
 @router.post("/evaluate")
 def evaluate(body: EvaluateRequest):
     if not body.answer.strip():
         raise HTTPException(status_code=400, detail="Answer cannot be empty.")
     try:
-        return nvidia.evaluate_answer(body.question, body.answer, body.topic)
+        return _ai().evaluate_answer(body.question, body.answer, body.topic)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -51,7 +69,7 @@ def dynamic_followups(body: DynamicFollowupsRequest):
     if not body.answer.strip():
         raise HTTPException(status_code=400, detail="Answer cannot be empty.")
     try:
-        followups = nvidia.generate_dynamic_followups(body.question, body.answer, body.topic)
+        followups = _ai().generate_dynamic_followups(body.question, body.answer, body.topic)
         return {"followups": followups}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -60,7 +78,7 @@ def dynamic_followups(body: DynamicFollowupsRequest):
 @router.post("/hint")
 def hint(body: HintRequest):
     try:
-        return {"hint": nvidia.get_hint(body.question, body.topic)}
+        return {"hint": _ai().get_hint(body.question, body.topic)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -68,7 +86,7 @@ def hint(body: HintRequest):
 @router.post("/generate-question")
 def generate_question(body: GenerateRequest, current: dict = Depends(a.require_contributor)):
     try:
-        return nvidia.generate_question(body.topic_number, body.topic)
+        return _ai().generate_question(body.topic_number, body.topic)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -78,6 +96,33 @@ def validate_question(body: ValidateQuestionRequest, current: dict = Depends(a.r
     if not body.question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
     try:
-        return nvidia.validate_question(body.topic, body.question, body.followups, body.code_challenge)
+        return _ai().validate_question(body.topic, body.question, body.followups, body.code_challenge)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/tts")
+def text_to_speech(body: TTSRequest):
+    """Generate speech audio using Gemini TTS. Returns base64-encoded WAV."""
+    if not body.text.strip():
+        raise HTTPException(status_code=400, detail="Text cannot be empty.")
+    if not _use_gemini():
+        raise HTTPException(status_code=503, detail="Gemini not configured — set GEMINI_API_KEY in .env")
+    try:
+        from services import gemini
+        wav_bytes = gemini.tts(body.text.strip(), body.voice or "Kore")
+        return {
+            "audio_base64": base64.b64encode(wav_bytes).decode(),
+            "mime_type": "audio/wav",
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/config")
+def ai_config():
+    """Returns which AI backend is active."""
+    return {
+        "provider": "gemini" if _use_gemini() else "nvidia",
+        "tts_available": _use_gemini(),
+    }

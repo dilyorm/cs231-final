@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { BookOpen, Shield, ChevronRight, Cpu, Settings, Mic, MicOff, Volume2, LogIn, History, RotateCcw, GraduationCap } from "lucide-react";
+import { BookOpen, Shield, ChevronRight, Cpu, Settings, Mic, MicOff, Volume2, LogIn, History, GraduationCap, Sun, Moon } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import { useTheme } from "../contexts/ThemeContext";
 
 export default function Home() {
   const [verbalMode, setVerbalMode] = useState(false);
   const navigate = useNavigate();
   const { user, logout, isAdmin, isContributor } = useAuth();
+  const { theme, toggle } = useTheme();
 
   function startExam() {
     sessionStorage.setItem("verbalMode", verbalMode ? "1" : "0");
@@ -22,6 +24,9 @@ export default function Home() {
           <span className="font-semibold text-slate-300 text-sm tracking-wide">CS231 · Computer Architecture</span>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
+          <button onClick={toggle} className="p-1.5 rounded-lg text-slate-600 hover:text-slate-400 hover:bg-slate-800/50 transition-colors" title="Toggle theme">
+            {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
           {user ? (
             <>
               {(isAdmin || isContributor) && (
@@ -128,7 +133,7 @@ export default function Home() {
                 <div className="flex items-start gap-2 px-3 py-2.5 bg-violet-950/30 border border-violet-500/20 rounded-lg">
                   <Volume2 className="w-4 h-4 text-violet-400 flex-shrink-0 mt-0.5" />
                   <p className="text-xs text-violet-300 leading-relaxed">
-                    Questions read aloud via TTS. Click mic to record your answers. Works best in Chrome/Edge.
+                    Questions read aloud via Gemini TTS (or browser fallback). Click mic to record answers. Works best in Chrome/Edge.
                   </p>
                 </div>
               )}

@@ -16,8 +16,8 @@ export default function Dashboard() {
   return (
     <div className="p-8">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-500 text-sm mt-1">CS231 Mock Exam — question bank overview</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
+        <p className="text-gray-500 dark:text-slate-400 text-sm mt-1">CS231 Mock Exam — question bank overview</p>
       </div>
 
       {/* Stat cards */}
@@ -26,55 +26,55 @@ export default function Dashboard() {
           icon={<BookOpen className="w-5 h-5 text-indigo-500" />}
           label="Total Questions"
           value={loading ? "..." : stats?.total_questions ?? 0}
-          bg="bg-indigo-50"
+          bg="bg-indigo-50 dark:bg-indigo-500/10"
         />
         <StatCard
           icon={<List className="w-5 h-5 text-violet-500" />}
           label="Topics Covered"
           value={loading ? "..." : stats?.topics.length ?? 0}
-          bg="bg-violet-50"
+          bg="bg-violet-50 dark:bg-violet-500/10"
         />
         <div
-          className="bg-white border border-gray-200 rounded-xl p-5 flex flex-col justify-between cursor-pointer hover:border-indigo-300 hover:shadow-sm transition-all"
+          className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl p-5 flex flex-col justify-between cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-600 hover:shadow-sm transition-all"
           onClick={() => navigate("/admin/questions/new")}
         >
-          <div className="w-9 h-9 rounded-lg bg-green-50 flex items-center justify-center mb-3">
+          <div className="w-9 h-9 rounded-lg bg-green-50 dark:bg-green-500/10 flex items-center justify-center mb-3">
             <PlusCircle className="w-5 h-5 text-green-500" />
           </div>
           <div>
-            <div className="text-sm font-semibold text-gray-900">Add Question</div>
-            <div className="text-xs text-gray-400 mt-0.5">Expand the bank</div>
+            <div className="text-sm font-semibold text-gray-900 dark:text-white">Add Question</div>
+            <div className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">Expand the bank</div>
           </div>
         </div>
       </div>
 
       {/* Topic breakdown */}
-      <div className="bg-white border border-gray-200 rounded-xl">
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
-          <BarChart3 className="w-4 h-4 text-gray-400" />
-          <h2 className="text-sm font-semibold text-gray-700">Questions per Topic</h2>
+      <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl">
+        <div className="px-5 py-4 border-b border-gray-100 dark:border-slate-800 flex items-center gap-2">
+          <BarChart3 className="w-4 h-4 text-gray-400 dark:text-slate-500" />
+          <h2 className="text-sm font-semibold text-gray-700 dark:text-slate-300">Questions per Topic</h2>
         </div>
 
         {loading ? (
-          <div className="p-8 text-center text-gray-400 text-sm">Loading...</div>
+          <div className="p-8 text-center text-gray-400 dark:text-slate-500 text-sm">Loading...</div>
         ) : (
-          <div className="divide-y divide-gray-50">
+          <div className="divide-y divide-gray-50 dark:divide-slate-800">
             {stats?.topics.map((t) => {
               const pct = stats.total_questions > 0 ? (t.count / stats.total_questions) * 100 : 0;
               return (
                 <div key={t.topic_number} className="px-5 py-3 flex items-center gap-4">
-                  <span className="w-8 text-right text-xs font-mono text-gray-400 flex-shrink-0">
+                  <span className="w-8 text-right text-xs font-mono text-gray-400 dark:text-slate-500 flex-shrink-0">
                     T{String(t.topic_number).padStart(2, "0")}
                   </span>
-                  <span className="flex-1 text-sm text-gray-700 truncate">{t.topic}</span>
+                  <span className="flex-1 text-sm text-gray-700 dark:text-slate-300 truncate">{t.topic}</span>
                   <div className="w-28 flex items-center gap-2 flex-shrink-0">
-                    <div className="flex-1 bg-gray-100 rounded-full h-1.5">
+                    <div className="flex-1 bg-gray-100 dark:bg-slate-800 rounded-full h-1.5">
                       <div
                         className="h-1.5 rounded-full bg-indigo-500"
                         style={{ width: `${pct}%` }}
                       />
                     </div>
-                    <span className="text-xs text-gray-500 w-5 text-right">{t.count}</span>
+                    <span className="text-xs text-gray-500 dark:text-slate-400 w-5 text-right">{t.count}</span>
                   </div>
                 </div>
               );
@@ -87,23 +87,17 @@ export default function Dashboard() {
 }
 
 function StatCard({
-  icon,
-  label,
-  value,
-  bg,
+  icon, label, value, bg,
 }: {
-  icon: React.ReactNode;
-  label: string;
-  value: number | string;
-  bg: string;
+  icon: React.ReactNode; label: string; value: number | string; bg: string;
 }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5">
+    <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl p-5">
       <div className={`w-9 h-9 rounded-lg ${bg} flex items-center justify-center mb-3`}>
         {icon}
       </div>
-      <div className="text-2xl font-bold text-gray-900">{value}</div>
-      <div className="text-xs text-gray-400 mt-0.5">{label}</div>
+      <div className="text-2xl font-bold text-gray-900 dark:text-white">{value}</div>
+      <div className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">{label}</div>
     </div>
   );
 }

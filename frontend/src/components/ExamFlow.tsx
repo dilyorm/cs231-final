@@ -68,6 +68,11 @@ export default function ExamFlow({ session: initialSession, verbalMode, onDone }
 
   const timer = useCountdown(PREP_SECONDS);
 
+  // Start prep timer automatically when prep-handout is shown
+  useEffect(() => {
+    if (phase === "prep-handout") timer.start();
+  }, [phase]);
+
   const questions = session.questions;
   const prepCount = session.prep_count;
   const current = questions[qIdx];
@@ -229,15 +234,24 @@ export default function ExamFlow({ session: initialSession, verbalMode, onDone }
         <Header isPrep timer={null} verbalMode={verbalMode} tts={tts} qIdx={0} total={questions.length} />
         <div className="flex-1 flex items-center justify-center px-4 py-10">
           <div className="w-full max-w-2xl">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-8 h-8 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center">
-                <Clock className="w-4 h-4 text-amber-400" />
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center">
+                  <Clock className="w-4 h-4 text-amber-400" />
+                </div>
+                <span className="text-amber-400 text-sm font-semibold uppercase tracking-wide">Preparation — 20 minutes to read</span>
               </div>
-              <span className="text-amber-400 text-sm font-semibold uppercase tracking-wide">Preparation — 20 minutes</span>
+              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm font-mono font-bold
+                ${timer.urgency === "critical" ? "text-red-400 border-red-500/40 bg-red-500/10 animate-pulse" :
+                  timer.urgency === "warning" ? "text-amber-400 border-amber-500/40 bg-amber-500/10" :
+                  "text-slate-300 border-slate-600 bg-slate-800"}`}>
+                <Clock className="w-3.5 h-3.5" />
+                {String(timer.minutes).padStart(2, "0")}:{String(timer.seconds).padStart(2, "0")}
+              </div>
             </div>
             <h2 className="text-2xl font-bold mb-1">Your preparation questions</h2>
             <p className="text-slate-400 text-sm mb-8">
-              Study these {prepCount} question{prepCount !== 1 ? "s" : ""}. You'll answer them with follow-ups, and get your score at the end of each.
+              Read and study these {prepCount} question{prepCount !== 1 ? "s" : ""} during your prep time. When ready, click below to start answering — no timer during answers.
             </p>
             <div className="space-y-4">
               {questions.slice(0, prepCount).map((q, i) => (
@@ -253,7 +267,7 @@ export default function ExamFlow({ session: initialSession, verbalMode, onDone }
               ))}
             </div>
             <button
-              onClick={() => { setPhase("answering"); timer.start(); if (verbalMode) speakText(questions[0].question); }}
+              onClick={() => { timer.stop(); setPhase("answering"); if (verbalMode) speakText(questions[0].question); }}
               className="mt-8 w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 rounded-xl transition-all"
             >
               <Clock className="w-4 h-4" />
@@ -375,17 +389,11 @@ export default function ExamFlow({ session: initialSession, verbalMode, onDone }
 
   return (
     <Screen>
-      <Header isPrep={isPrep} timer={isPrep ? timer : null} verbalMode={verbalMode} tts={tts} qIdx={qIdx} total={questions.length} />
+      <Header isPrep={isPrep} timer={null} verbalMode={verbalMode} tts={tts} qIdx={qIdx} total={questions.length} />
 
       <div className="h-0.5 bg-slate-800">
         <div className="h-full bg-indigo-500 transition-all duration-500" style={{ width: `${(qIdx / questions.length) * 100}%` }} />
       </div>
-
-      {isPrep && timer.expired && (
-        <div className="bg-red-600 text-white text-xs text-center py-1.5 font-semibold">
-          ⏰ Time's up! Finish your current answer and move on.
-        </div>
-      )}
 
       <main className="flex-1 flex justify-center px-3 sm:px-4 py-4 sm:py-6 overflow-y-auto">
         <div className="w-full max-w-2xl space-y-4 sm:space-y-5">
@@ -637,6 +645,9 @@ function AnswerInput({ value, onChange, verbalMode, stt, label }: {
         <p className="text-xs text-red-400 mt-1 flex items-center gap-1">
           <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse inline-block" /> Listening...
         </p>
+      )}
+      {stt.error && !stt.listening && (
+        <p className="text-xs text-orange-400 mt-1">{stt.error}</p>
       )}
     </div>
   );

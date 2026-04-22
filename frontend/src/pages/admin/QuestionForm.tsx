@@ -47,10 +47,19 @@ const DEFAULT: FormData = {
   code_challenge: "",
 };
 
+function Spin() {
+  return (
+    <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+    </svg>
+  );
+}
+
 export default function QuestionForm() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { isAdmin, isContributor } = useAuth();
+  const { isAdmin } = useAuth();
   const isEdit = Boolean(id);
 
   const [form, setForm] = useState<FormData>(DEFAULT);
@@ -63,7 +72,7 @@ export default function QuestionForm() {
 
   useEffect(() => {
     if (!isEdit || !id) return;
-    api.getQuestion(id).then((q) => {
+    api.getQuestion(id).then(q => {
       setForm({
         topic_number: q.topic_number,
         topic: q.topic,
@@ -76,37 +85,24 @@ export default function QuestionForm() {
   }, [id, isEdit]);
 
   function setField<K extends keyof FormData>(key: K, val: FormData[K]) {
-    setForm((prev) => ({ ...prev, [key]: val }));
+    setForm(prev => ({ ...prev, [key]: val }));
     setValidation(null);
   }
 
   function setTopicNumber(n: number) {
-    setForm((prev) => ({
-      ...prev,
-      topic_number: n,
-      topic: TOPIC_NAMES[n] ?? prev.topic,
-    }));
+    setForm(prev => ({ ...prev, topic_number: n, topic: TOPIC_NAMES[n] ?? prev.topic }));
     setValidation(null);
   }
 
   function setFollowup(i: number, val: string) {
-    setForm((prev) => {
-      const f = [...prev.followups];
-      f[i] = val;
-      return { ...prev, followups: f };
-    });
+    setForm(prev => { const f = [...prev.followups]; f[i] = val; return { ...prev, followups: f }; });
     setValidation(null);
   }
 
-  function addFollowup() {
-    setForm((prev) => ({ ...prev, followups: [...prev.followups, ""] }));
-  }
+  function addFollowup() { setForm(prev => ({ ...prev, followups: [...prev.followups, ""] })); }
 
   function removeFollowup(i: number) {
-    setForm((prev) => ({
-      ...prev,
-      followups: prev.followups.filter((_, idx) => idx !== i),
-    }));
+    setForm(prev => ({ ...prev, followups: prev.followups.filter((_, idx) => idx !== i) }));
   }
 
   async function generateWithAI() {
@@ -115,7 +111,7 @@ export default function QuestionForm() {
     setValidation(null);
     try {
       const generated = await api.generateQuestion(form.topic_number, form.topic);
-      setForm((prev) => ({
+      setForm(prev => ({
         ...prev,
         question: generated.question,
         followups: generated.followups.length > 0 ? generated.followups : [""],
@@ -129,19 +125,13 @@ export default function QuestionForm() {
   }
 
   async function runValidation() {
-    const followups = form.followups.filter((f) => f.trim());
+    const followups = form.followups.filter(f => f.trim());
     if (!form.question.trim()) { setError("Question is required before validating."); return; }
     if (followups.length === 0) { setError("At least one follow-up is required before validating."); return; }
     setError("");
     setValidating(true);
     try {
-      const result = await api.validateQuestion(
-        form.topic,
-        form.question,
-        followups,
-        form.code_challenge.trim() || null,
-      );
-      setValidation(result);
+      setValidation(await api.validateQuestion(form.topic, form.question, followups, form.code_challenge.trim() || null));
     } catch (e: any) {
       setError(e.message ?? "Validation failed.");
     } finally {
@@ -152,17 +142,13 @@ export default function QuestionForm() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-
-    const followups = form.followups.filter((f) => f.trim());
+    const followups = form.followups.filter(f => f.trim());
     if (!form.question.trim()) { setError("Question is required."); return; }
     if (followups.length === 0) { setError("At least one follow-up is required."); return; }
-
-    // Contributors must pass AI validation before saving
     if (!isAdmin) {
       if (!validation) { setError("Run AI validation before saving."); return; }
       if (!validation.approved) { setError("Fix the issues flagged by AI before saving."); return; }
     }
-
     const payload = {
       topic_number: form.topic_number,
       topic: form.topic.trim(),
@@ -170,14 +156,10 @@ export default function QuestionForm() {
       followups,
       code_challenge: form.code_challenge.trim() || null,
     };
-
     setSaving(true);
     try {
-      if (isEdit && id) {
-        await api.updateQuestion(id, payload);
-      } else {
-        await api.createQuestion(payload);
-      }
+      if (isEdit && id) await api.updateQuestion(id, payload);
+      else await api.createQuestion(payload);
       navigate("/admin/questions");
     } catch (err: any) {
       setError(err.message ?? "Save failed.");
@@ -186,8 +168,10 @@ export default function QuestionForm() {
     }
   }
 
+  const inputCls = "w-full border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-300 dark:focus:ring-indigo-600";
+
   if (loading) {
-    return <div className="p-8 text-center text-gray-400">Loading question...</div>;
+    return <div className="p-8 text-center text-gray-400 dark:text-slate-500">Loading question...</div>;
   }
 
   return (
@@ -196,15 +180,15 @@ export default function QuestionForm() {
       <div className="flex items-center gap-3 mb-6">
         <button
           onClick={() => navigate(-1)}
-          className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+          className="p-1.5 text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
         </button>
         <div>
-          <h1 className="text-xl font-bold text-gray-900">
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white">
             {isEdit ? "Edit Question" : "Add Question"}
           </h1>
-          <p className="text-sm text-gray-400 mt-0.5">
+          <p className="text-sm text-gray-400 dark:text-slate-500 mt-0.5">
             {isEdit ? `Editing ${id}` : "New question — AI review required before saving"}
           </p>
         </div>
@@ -214,24 +198,24 @@ export default function QuestionForm() {
         {/* Topic */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Topic Number</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5">Topic Number</label>
             <select
               value={form.topic_number}
-              onChange={(e) => setTopicNumber(Number(e.target.value))}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              onChange={e => setTopicNumber(Number(e.target.value))}
+              className={inputCls}
             >
-              {Array.from({ length: 23 }, (_, i) => i + 1).map((n) => (
+              {Array.from({ length: 23 }, (_, i) => i + 1).map(n => (
                 <option key={n} value={n}>Topic {n}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Topic Name</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5">Topic Name</label>
             <input
               type="text"
               value={form.topic}
-              onChange={(e) => setField("topic", e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              onChange={e => setField("topic", e.target.value)}
+              className={inputCls}
             />
           </div>
         </div>
@@ -242,44 +226,37 @@ export default function QuestionForm() {
             type="button"
             onClick={generateWithAI}
             disabled={generating}
-            className="flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-sm font-medium px-4 py-2.5 rounded-lg transition-colors disabled:opacity-60 w-full justify-center"
+            className="flex items-center gap-2 bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 border border-indigo-200 dark:border-indigo-500/30 text-indigo-700 dark:text-indigo-400 text-sm font-medium px-4 py-2.5 rounded-lg transition-colors disabled:opacity-60 w-full justify-center"
           >
-            {generating ? (
-              <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-              </svg>
-            ) : (
-              <Sparkles className="w-4 h-4" />
-            )}
+            {generating ? <Spin /> : <Sparkles className="w-4 h-4" />}
             {generating ? "Generating with AI..." : "Generate Question with AI"}
           </button>
         )}
 
         {/* Question */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+          <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5">
             Question <span className="text-red-400">*</span>
           </label>
           <textarea
             value={form.question}
-            onChange={(e) => setField("question", e.target.value)}
+            onChange={e => setField("question", e.target.value)}
             rows={3}
             placeholder="Type the exam question..."
-            className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+            className={inputCls + " resize-none"}
           />
         </div>
 
         {/* Follow-ups */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <label className="text-sm font-medium text-gray-700">
+            <label className="text-sm font-medium text-gray-700 dark:text-slate-300">
               Follow-up Questions <span className="text-red-400">*</span>
             </label>
             <button
               type="button"
               onClick={addFollowup}
-              className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+              className="flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium"
             >
               <Plus className="w-3.5 h-3.5" />
               Add follow-up
@@ -288,19 +265,19 @@ export default function QuestionForm() {
           <div className="space-y-2">
             {form.followups.map((f, i) => (
               <div key={i} className="flex gap-2">
-                <span className="mt-2.5 text-xs text-gray-400 font-mono w-5 text-right flex-shrink-0">{i + 1}.</span>
+                <span className="mt-2.5 text-xs text-gray-400 dark:text-slate-500 font-mono w-5 text-right flex-shrink-0">{i + 1}.</span>
                 <input
                   type="text"
                   value={f}
-                  onChange={(e) => setFollowup(i, e.target.value)}
+                  onChange={e => setFollowup(i, e.target.value)}
                   placeholder={`Follow-up question ${i + 1}...`}
-                  className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  className={inputCls + " flex-1"}
                 />
                 {form.followups.length > 1 && (
                   <button
                     type="button"
                     onClick={() => removeFollowup(i)}
-                    className="mt-1 p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                    className="mt-1 p-1.5 text-gray-300 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -312,83 +289,68 @@ export default function QuestionForm() {
 
         {/* Code challenge */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+          <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5">
             Code Challenge <span className="text-gray-400 font-normal">(optional)</span>
           </label>
           <textarea
             value={form.code_challenge}
-            onChange={(e) => setField("code_challenge", e.target.value)}
+            onChange={e => setField("code_challenge", e.target.value)}
             rows={2}
             placeholder="e.g. Write NASM code to compute factorial(n)..."
-            className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 resize-none"
+            className={inputCls + " resize-none focus:ring-emerald-300 dark:focus:ring-emerald-600"}
           />
         </div>
 
-        {/* AI Validation — required for contributors */}
+        {/* AI Validation */}
         {!isAdmin && (
-          <div className="border border-gray-200 rounded-xl overflow-hidden">
-            <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+          <div className="border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden">
+            <div className="px-4 py-3 bg-gray-50 dark:bg-slate-800/50 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-300">
                 <ShieldCheck className="w-4 h-4 text-indigo-500" />
                 AI Quality Review
               </div>
-              <span className="text-xs text-gray-400">Required before saving</span>
+              <span className="text-xs text-gray-400 dark:text-slate-500">Required before saving</span>
             </div>
-            <div className="p-4">
+            <div className="p-4 bg-white dark:bg-slate-900">
               {!validation ? (
                 <button
                   type="button"
                   onClick={runValidation}
                   disabled={validating}
-                  className="flex items-center gap-2 bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50 text-sm font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-60 w-full justify-center"
+                  className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-500/30 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 text-sm font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-60 w-full justify-center"
                 >
-                  {validating ? (
-                    <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                    </svg>
-                  ) : (
-                    <ShieldCheck className="w-4 h-4" />
-                  )}
+                  {validating ? <Spin /> : <ShieldCheck className="w-4 h-4" />}
                   {validating ? "AI is reviewing..." : "Validate with AI"}
                 </button>
               ) : validation.approved ? (
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-emerald-700 font-medium text-sm">
+                  <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-medium text-sm">
                     <CheckCircle2 className="w-4 h-4" />
                     Question approved by AI
                   </div>
-                  <p className="text-xs text-gray-500">{validation.reason}</p>
-                  <button
-                    type="button"
-                    onClick={() => setValidation(null)}
-                    className="text-xs text-gray-400 hover:text-gray-600 underline"
-                  >
+                  <p className="text-xs text-gray-500 dark:text-slate-400">{validation.reason}</p>
+                  <button type="button" onClick={() => setValidation(null)} className="text-xs text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 underline">
                     Re-validate after edits
                   </button>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-red-600 font-medium text-sm">
+                  <div className="flex items-center gap-2 text-red-600 dark:text-red-400 font-medium text-sm">
                     <AlertTriangle className="w-4 h-4" />
                     AI rejected this question
                   </div>
-                  <p className="text-xs text-gray-600">{validation.reason}</p>
+                  <p className="text-xs text-gray-600 dark:text-slate-300">{validation.reason}</p>
                   {validation.issues !== "None" && (
-                    <div className="bg-red-50 border border-red-100 rounded-lg px-3 py-2 text-xs text-red-700">
+                    <div className="bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 rounded-lg px-3 py-2 text-xs text-red-700 dark:text-red-400">
                       <strong>Issues:</strong> {validation.issues}
                     </div>
                   )}
                   {validation.suggestions !== "None" && (
-                    <div className="bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 text-xs text-amber-700">
+                    <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-100 dark:border-amber-500/20 rounded-lg px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
                       <strong>Suggestions:</strong> {validation.suggestions}
                     </div>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => setValidation(null)}
-                    className="text-xs text-indigo-600 hover:text-indigo-800 underline"
-                  >
+                  <button type="button" onClick={() => setValidation(null)} className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 underline">
                     Edit and re-validate
                   </button>
                 </div>
@@ -398,7 +360,7 @@ export default function QuestionForm() {
         )}
 
         {error && (
-          <p className="text-red-500 text-sm bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+          <p className="text-red-500 dark:text-red-400 text-sm bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 rounded-lg px-3 py-2">
             {error}
           </p>
         )}
@@ -408,7 +370,7 @@ export default function QuestionForm() {
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="flex-1 border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm font-medium py-2.5 rounded-lg transition-colors"
+            className="flex-1 border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 text-sm font-medium py-2.5 rounded-lg transition-colors"
           >
             Cancel
           </button>
