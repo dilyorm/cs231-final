@@ -22,30 +22,32 @@ const C = {
 };
 
 // Slide PDFs served from /slides/
-const SLIDES: Record<number, { label: string; file: string }[]> = {
-  1:  [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
-  2:  [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
-  3:  [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
-  4:  [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
-  5:  [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
-  6:  [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
-  7:  [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
-  8:  [{ label: "Lecture 8 – NASM Macros", file: "L8.pdf" }, { label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
-  9:  [{ label: "Lecture 9 – STRUC & Alignment", file: "L9.pdf" }, { label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
-  10: [{ label: "Lecture 10 – Data Types & Arrays", file: "L10.pdf" }, { label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
-  11: [{ label: "Lecture 11 – Memory Layout", file: "L11.pdf" }, { label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
-  12: [{ label: "Lecture 12 – Cache", file: "L12.pdf" }, { label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
-  13: [{ label: "Lecture 13 – DRAM", file: "L13.pdf" }],
-  14: [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
-  15: [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
-  16: [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
-  17: [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
-  18: [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
-  19: [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
-  20: [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
-  21: [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
-  22: [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
-  23: [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
+// Each entry is the specific lecture slides extracted for that topic only.
+const SLIDES: Record<number, { label: string; file: string; pages?: string }[]> = {
+  1:  [{ label: "Binary Representation & Endianness", file: "topic01-binary.pdf", pages: "47 slides" }],
+  2:  [{ label: "Encoding Integers", file: "topic02-integers.pdf", pages: "63 slides" }],
+  3:  [{ label: "Floating Point", file: "topic03-floats.pdf", pages: "33 slides" }],
+  4:  [{ label: "x86/x64 Registers (intro)", file: "topic04-registers.pdf", pages: "20 slides" },
+       { label: "Assembly + Addressing (full context)", file: "topic05-assembly.pdf", pages: "89 slides" }],
+  5:  [{ label: "Assembly & Arithmetic", file: "topic05-assembly.pdf", pages: "89 slides" }],
+  6:  [{ label: "Addressing Modes & Control Flow", file: "topic06-control.pdf", pages: "76 slides" }],
+  7:  [{ label: "Stack & Procedures", file: "topic07-stack.pdf", pages: "22 slides" }],
+  8:  [{ label: "NASM Macros & Preprocessor", file: "topic08-macros.pdf", pages: "6 slides" }],
+  9:  [{ label: "STRUC, Alignment & Arrays", file: "topic09-struc.pdf", pages: "72 slides" }],
+  10: [{ label: "Data Types & Arrays", file: "topic10-datatypes.pdf", pages: "39 slides" }],
+  11: [{ label: "Memory Layout & Read/Write Transactions", file: "topic11-memlayout.pdf", pages: "45 slides" }],
+  12: [{ label: "Cache & Memory Hierarchy", file: "topic12-cache.pdf", pages: "88 slides" }],
+  13: [{ label: "DRAM", file: "topic13-dram.pdf", pages: "13 slides" }],
+  14: [{ label: "HDD & SSD Storage", file: "topic14-storage.pdf", pages: "35 slides" }],
+  15: [{ label: "Linkers & Symbol Resolution", file: "topic15-linkers.pdf", pages: "45 slides" }],
+  16: [{ label: "Exceptions (Async/Sync)", file: "topic16-exceptions.pdf", pages: "12 slides" }],
+  17: [{ label: "Processes & Threads", file: "topic17-processes.pdf", pages: "33 slides" }],
+  18: [{ label: "Signals & Signal Handlers", file: "topic18-signals.pdf", pages: "34 slides" }],
+  19: [{ label: "Input/Output (Unix I/O)", file: "topic19-io.pdf", pages: "31 slides" }],
+  20: [{ label: "Virtual Memory & Address Translation", file: "topic20-vmem.pdf", pages: "76 slides" }],
+  21: [{ label: "Concurrent Programming & Parallelism", file: "topic21-22-concurrent.pdf", pages: "107 slides" }],
+  22: [{ label: "Parallelism & Synchronization", file: "topic21-22-concurrent.pdf", pages: "107 slides" }],
+  23: [{ label: "Virtual Machines", file: "topic23-vmachines.pdf", pages: "25 slides" }],
 };
 
 function Block({ b, dot }: { b: Block; dot: string }) {
@@ -1876,14 +1878,17 @@ export default function StudyPage() {
                 {slides.map((s, si) => (
                   <div key={si} className="border border-indigo-200 dark:border-indigo-700/40 rounded-lg overflow-hidden bg-white dark:bg-slate-900">
                     <div className="flex items-center justify-between px-3 py-2.5 gap-2">
-                      <span className="text-sm font-medium text-gray-800 dark:text-slate-200 truncate">{s.label}</span>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-sm font-medium text-gray-800 dark:text-slate-200 truncate">{s.label}</span>
+                        {s.pages && <span className="text-xs text-indigo-500 dark:text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded-full flex-shrink-0">{s.pages}</span>}
+                      </div>
                       <div className="flex items-center gap-1.5 flex-shrink-0">
                         <button
-                          onClick={() => setActiveSlide(activeSlide === s.file && slideOpen ? null : s.file)}
+                          onClick={() => setActiveSlide(activeSlide === s.file ? null : s.file)}
                           className="flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 px-2 py-1 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-900/40 transition-colors"
                         >
                           <ExternalLink className="w-3 h-3" />
-                          <span className="hidden sm:inline">View</span>
+                          <span className="hidden sm:inline">{activeSlide === s.file ? "Close" : "View"}</span>
                         </button>
                         <a href={`/slides/${s.file}`} download
                           className="flex items-center gap-1 text-xs text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 px-2 py-1 rounded-md hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors">
