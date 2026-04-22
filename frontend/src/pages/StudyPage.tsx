@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, BookOpen, ChevronRight, ChevronDown, Star, AlertTriangle } from "lucide-react";
+import { ArrowLeft, BookOpen, ChevronRight, ChevronDown, Star, AlertTriangle, Sun, Moon, FileText, Download, ExternalLink } from "lucide-react";
+import { useTheme } from "../contexts/ThemeContext";
 
 type Block =
   | { t: "p"; c: string }
@@ -14,46 +15,73 @@ interface Section { heading: string; icon: string; color: string; blocks: Block[
 interface Topic { number: number; short: string; title: string; overview: string; sections: Section[] }
 
 const C = {
-  indigo: { card: "bg-indigo-950/30 border-indigo-500/20", badge: "text-indigo-300", ch: "text-indigo-500", dot: "bg-indigo-400" },
-  violet: { card: "bg-violet-950/30 border-violet-500/20", badge: "text-violet-300", ch: "text-violet-500", dot: "bg-violet-400" },
-  amber:  { card: "bg-amber-950/30  border-amber-500/20",  badge: "text-amber-300",  ch: "text-amber-500",  dot: "bg-amber-400"  },
-  red:    { card: "bg-red-950/30    border-red-500/20",    badge: "text-red-300",    ch: "text-red-500",    dot: "bg-red-400"    },
+  indigo: { card: "bg-indigo-50 dark:bg-indigo-950/30 border-indigo-200 dark:border-indigo-500/20", badge: "text-indigo-700 dark:text-indigo-300", ch: "text-indigo-500", dot: "bg-indigo-500 dark:bg-indigo-400" },
+  violet: { card: "bg-violet-50 dark:bg-violet-950/30 border-violet-200 dark:border-violet-500/20", badge: "text-violet-700 dark:text-violet-300", ch: "text-violet-500", dot: "bg-violet-500 dark:bg-violet-400" },
+  amber:  { card: "bg-amber-50  dark:bg-amber-950/30  border-amber-200  dark:border-amber-500/20",  badge: "text-amber-700  dark:text-amber-300",  ch: "text-amber-500",  dot: "bg-amber-500  dark:bg-amber-400"  },
+  red:    { card: "bg-red-50    dark:bg-red-950/30    border-red-200    dark:border-red-500/20",    badge: "text-red-700    dark:text-red-300",    ch: "text-red-500",    dot: "bg-red-500    dark:bg-red-400"    },
+};
+
+// Slide PDFs served from /slides/
+const SLIDES: Record<number, { label: string; file: string }[]> = {
+  1:  [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
+  2:  [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
+  3:  [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
+  4:  [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
+  5:  [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
+  6:  [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
+  7:  [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
+  8:  [{ label: "Lecture 8 – NASM Macros", file: "L8.pdf" }, { label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
+  9:  [{ label: "Lecture 9 – STRUC & Alignment", file: "L9.pdf" }, { label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
+  10: [{ label: "Lecture 10 – Data Types & Arrays", file: "L10.pdf" }, { label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
+  11: [{ label: "Lecture 11 – Memory Layout", file: "L11.pdf" }, { label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
+  12: [{ label: "Lecture 12 – Cache", file: "L12.pdf" }, { label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
+  13: [{ label: "Lecture 13 – DRAM", file: "L13.pdf" }],
+  14: [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
+  15: [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
+  16: [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
+  17: [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
+  18: [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
+  19: [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
+  20: [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
+  21: [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
+  22: [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
+  23: [{ label: "Lectures 1–12 (all)", file: "slides-all.pdf" }],
 };
 
 function Block({ b, dot }: { b: Block; dot: string }) {
-  if (b.t === "p") return <p className="text-slate-300 text-sm leading-relaxed mb-2">{b.c}</p>;
+  if (b.t === "p") return <p className="text-gray-700 dark:text-slate-300 text-sm leading-relaxed mb-2">{b.c}</p>;
   if (b.t === "list") return (
     <ul className="space-y-1.5 mb-2">
       {b.items.map((item, i) => (
         <li key={i} className="flex items-start gap-2">
           <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 mt-[7px] ${dot}`} />
-          <span className="text-slate-300 text-sm leading-relaxed">{item}</span>
+          <span className="text-gray-700 dark:text-slate-300 text-sm leading-relaxed">{item}</span>
         </li>
       ))}
     </ul>
   );
   if (b.t === "code") return (
     <div className="mb-3">
-      {b.label && <div className="text-xs text-slate-500 mb-1 font-mono">{b.label}</div>}
-      <pre className="bg-slate-900 border border-slate-700/60 rounded-lg p-3 text-xs text-amber-200 font-mono overflow-x-auto leading-relaxed whitespace-pre">{b.c}</pre>
+      {b.label && <div className="text-xs text-gray-500 dark:text-slate-500 mb-1 font-mono">{b.label}</div>}
+      <pre className="bg-gray-100 dark:bg-slate-900 border border-gray-300 dark:border-slate-700/60 rounded-lg p-3 text-xs text-amber-700 dark:text-amber-200 font-mono overflow-x-auto leading-relaxed whitespace-pre">{b.c}</pre>
     </div>
   );
   if (b.t === "dia") return (
     <div className="mb-3">
-      {b.label && <div className="text-xs text-slate-500 mb-1">{b.label}</div>}
-      <pre className="bg-slate-950 border border-emerald-900/40 rounded-lg p-3 text-xs text-emerald-300 font-mono overflow-x-auto leading-relaxed whitespace-pre">{b.c}</pre>
+      {b.label && <div className="text-xs text-gray-500 dark:text-slate-500 mb-1">{b.label}</div>}
+      <pre className="bg-gray-50 dark:bg-slate-950 border border-emerald-200 dark:border-emerald-900/40 rounded-lg p-3 text-xs text-emerald-700 dark:text-emerald-300 font-mono overflow-x-auto leading-relaxed whitespace-pre">{b.c}</pre>
     </div>
   );
   if (b.t === "table") return (
     <div className="mb-3 overflow-x-auto">
       <table className="w-full text-xs border-collapse">
         <thead>
-          <tr>{b.h.map((h, i) => <th key={i} className="border border-slate-700 bg-slate-800 px-2 py-1.5 text-slate-300 text-left font-semibold">{h}</th>)}</tr>
+          <tr>{b.h.map((h, i) => <th key={i} className="border border-gray-300 dark:border-slate-700 bg-gray-200 dark:bg-slate-800 px-2 py-1.5 text-gray-700 dark:text-slate-300 text-left font-semibold">{h}</th>)}</tr>
         </thead>
         <tbody>
           {b.r.map((row, i) => (
-            <tr key={i} className={i % 2 === 0 ? "bg-slate-900/50" : "bg-slate-800/20"}>
-              {row.map((cell, j) => <td key={j} className="border border-slate-700/40 px-2 py-1.5 text-slate-300 font-mono">{cell}</td>)}
+            <tr key={i} className={i % 2 === 0 ? "bg-gray-50 dark:bg-slate-900/50" : "bg-white dark:bg-slate-800/20"}>
+              {row.map((cell, j) => <td key={j} className="border border-gray-200 dark:border-slate-700/40 px-2 py-1.5 text-gray-700 dark:text-slate-300 font-mono">{cell}</td>)}
             </tr>
           ))}
         </tbody>
@@ -61,16 +89,16 @@ function Block({ b, dot }: { b: Block; dot: string }) {
     </div>
   );
   if (b.t === "warn") return (
-    <div className="mb-2 bg-red-950/40 border border-red-500/25 rounded-lg p-3">
+    <div className="mb-2 bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-500/25 rounded-lg p-3">
       <div className="flex items-center gap-1.5 mb-2">
-        <AlertTriangle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
-        <span className="text-xs font-bold text-red-400">EXAM TRAPS</span>
+        <AlertTriangle className="w-3.5 h-3.5 text-red-500 dark:text-red-400 flex-shrink-0" />
+        <span className="text-xs font-bold text-red-600 dark:text-red-400">EXAM TRAPS</span>
       </div>
       <ul className="space-y-1.5">
         {b.items.map((item, i) => (
           <li key={i} className="flex items-start gap-2">
             <span className="text-red-500 text-xs flex-shrink-0 mt-0.5">→</span>
-            <span className="text-red-200 text-xs leading-relaxed">{item}</span>
+            <span className="text-red-700 dark:text-red-200 text-xs leading-relaxed">{item}</span>
           </li>
         ))}
       </ul>
@@ -1749,13 +1777,19 @@ With EPT (Intel) / NPT (AMD):
 
 export default function StudyPage() {
   const navigate = useNavigate();
+  const { theme, toggle: toggleTheme } = useTheme();
   const [selected, setSelected] = useState(0);
   const [open, setOpen] = useState<Record<string, boolean>>({});
+  const [slideOpen, setSlideOpen] = useState(false);
+  const [activeSlide, setActiveSlide] = useState<string | null>(null);
   const topic = TOPICS[selected];
+  const slides = SLIDES[topic.number] ?? [];
 
   function selectTopic(i: number) {
     setSelected(i);
     setOpen({});
+    setSlideOpen(false);
+    setActiveSlide(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -1763,25 +1797,43 @@ export default function StudyPage() {
     setOpen(p => ({ ...p, [key]: !(p[key] ?? true) }));
   }
 
+  function openSlide(file: string) {
+    setActiveSlide(file);
+    setSlideOpen(true);
+  }
+
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      <header className="border-b border-slate-800 px-4 sm:px-6 py-3 flex items-center gap-3 sticky top-0 bg-slate-950/95 backdrop-blur z-20">
-        <button onClick={() => navigate("/")} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors flex-shrink-0">
+    <div className="min-h-screen bg-white dark:bg-slate-950 text-gray-900 dark:text-white transition-colors">
+      <header className="border-b border-gray-200 dark:border-slate-800 px-3 sm:px-6 py-3 flex items-center gap-2 sm:gap-3 sticky top-0 bg-white/95 dark:bg-slate-950/95 backdrop-blur z-20">
+        <button onClick={() => navigate("/")} className="p-1.5 text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors flex-shrink-0">
           <ArrowLeft className="w-4 h-4" />
         </button>
-        <BookOpen className="w-4 h-4 text-indigo-400 flex-shrink-0" />
-        <span className="font-semibold text-sm text-slate-200">CS231 Study Guide</span>
-        <span className="text-slate-600 hidden sm:inline">·</span>
-        <span className="text-slate-500 text-xs hidden sm:inline">23 Topics · Spring 2026</span>
+        <BookOpen className="w-4 h-4 text-indigo-500 dark:text-indigo-400 flex-shrink-0" />
+        <span className="font-semibold text-sm text-gray-700 dark:text-slate-200 truncate">CS231 Study Guide</span>
+        <span className="text-gray-300 dark:text-slate-600 hidden sm:inline flex-shrink-0">·</span>
+        <span className="text-gray-400 dark:text-slate-500 text-xs hidden sm:inline flex-shrink-0">23 Topics · Spring 2026</span>
+        <div className="ml-auto flex items-center gap-2 flex-shrink-0">
+          <a href="/slides/exam-questions.pdf" target="_blank" rel="noopener noreferrer"
+            className="hidden sm:flex items-center gap-1.5 text-xs text-gray-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800">
+            <FileText className="w-3.5 h-3.5" /> Exam Q&amp;A
+          </a>
+          <button onClick={toggleTheme}
+            className="p-1.5 rounded-lg text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+            title="Toggle theme">
+            {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
+        </div>
       </header>
 
-      <div className="border-b border-slate-800 bg-slate-900/60 sticky top-[53px] z-10">
-        <div className="overflow-x-auto">
-          <div className="flex px-4 py-2 gap-1.5 min-w-max">
+      <div className="border-b border-gray-200 dark:border-slate-800 bg-gray-50/80 dark:bg-slate-900/60 sticky top-[53px] z-10">
+        <div className="overflow-x-auto scrollbar-hide">
+          <div className="flex px-3 sm:px-4 py-2 gap-1 sm:gap-1.5 min-w-max">
             {TOPICS.map((t, i) => (
               <button key={i} onClick={() => selectTopic(i)}
-                className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
-                  selected === i ? "bg-indigo-600 text-white" : "text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                className={`flex-shrink-0 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
+                  selected === i
+                    ? "bg-indigo-600 text-white"
+                    : "text-gray-500 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-slate-200"
                 }`}>
                 {t.number}. {t.short}
               </button>
@@ -1790,20 +1842,77 @@ export default function StudyPage() {
         </div>
       </div>
 
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
-        <div className="mb-6">
+      <div className="max-w-3xl mx-auto px-3 sm:px-6 py-4 sm:py-6">
+        <div className="mb-5 sm:mb-6">
           <div className="flex items-center justify-between mb-3 gap-3">
-            <span className="text-xs font-semibold bg-indigo-500/15 text-indigo-400 border border-indigo-500/25 px-2.5 py-1 rounded-full flex-shrink-0">
+            <span className="text-xs font-semibold bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/25 px-2.5 py-1 rounded-full flex-shrink-0">
               Topic {topic.number} / 23
             </span>
-            <div className="flex items-center gap-4 ml-auto">
-              {selected > 0 && <button onClick={() => selectTopic(selected - 1)} className="text-xs text-slate-500 hover:text-slate-300 transition-colors">← Prev</button>}
-              {selected < TOPICS.length - 1 && <button onClick={() => selectTopic(selected + 1)} className="text-xs text-slate-500 hover:text-slate-300 transition-colors">Next →</button>}
+            <div className="flex items-center gap-3 sm:gap-4 ml-auto">
+              {selected > 0 && <button onClick={() => selectTopic(selected - 1)} className="text-xs text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-300 transition-colors">← Prev</button>}
+              {selected < TOPICS.length - 1 && <button onClick={() => selectTopic(selected + 1)} className="text-xs text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-300 transition-colors">Next →</button>}
             </div>
           </div>
-          <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">{topic.title}</h1>
-          <p className="text-slate-400 text-sm leading-relaxed">{topic.overview}</p>
+          <h1 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white mb-2">{topic.title}</h1>
+          <p className="text-gray-500 dark:text-slate-400 text-sm leading-relaxed">{topic.overview}</p>
         </div>
+
+        {/* Lecture Slides section */}
+        {slides.length > 0 && (
+          <div className="mb-4 border border-indigo-200 dark:border-indigo-500/20 rounded-xl overflow-hidden bg-indigo-50 dark:bg-indigo-950/20">
+            <button
+              onClick={() => setSlideOpen(v => !v)}
+              className="w-full flex items-center justify-between px-4 py-3 text-left"
+            >
+              <div className="flex items-center gap-2.5">
+                <FileText className="w-4 h-4 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
+                <span className="font-semibold text-sm text-indigo-700 dark:text-indigo-300">Lecture Slides</span>
+                <span className="text-xs text-indigo-500 dark:text-indigo-500 bg-indigo-100 dark:bg-indigo-900/40 px-1.5 py-0.5 rounded-full">{slides.length}</span>
+              </div>
+              <ChevronDown className={`w-4 h-4 text-indigo-500 transition-transform duration-200 ${slideOpen ? "rotate-180" : ""}`} />
+            </button>
+            {slideOpen && (
+              <div className="px-4 pb-4 space-y-3">
+                {slides.map((s, si) => (
+                  <div key={si} className="border border-indigo-200 dark:border-indigo-700/40 rounded-lg overflow-hidden bg-white dark:bg-slate-900">
+                    <div className="flex items-center justify-between px-3 py-2.5 gap-2">
+                      <span className="text-sm font-medium text-gray-800 dark:text-slate-200 truncate">{s.label}</span>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <button
+                          onClick={() => setActiveSlide(activeSlide === s.file && slideOpen ? null : s.file)}
+                          className="flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 px-2 py-1 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-900/40 transition-colors"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          <span className="hidden sm:inline">View</span>
+                        </button>
+                        <a href={`/slides/${s.file}`} download
+                          className="flex items-center gap-1 text-xs text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 px-2 py-1 rounded-md hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors">
+                          <Download className="w-3 h-3" />
+                          <span className="hidden sm:inline">Download</span>
+                        </a>
+                        <a href={`/slides/${s.file}`} target="_blank" rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-xs text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 px-2 py-1 rounded-md hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors">
+                          <ExternalLink className="w-3 h-3" />
+                          <span className="hidden sm:inline">New tab</span>
+                        </a>
+                      </div>
+                    </div>
+                    {activeSlide === s.file && (
+                      <div className="border-t border-indigo-200 dark:border-indigo-700/40">
+                        <iframe
+                          src={`/slides/${s.file}`}
+                          className="w-full rounded-b-lg"
+                          style={{ height: "70vh", minHeight: 400 }}
+                          title={s.label}
+                        />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="space-y-3">
           {topic.sections.map((sec, si) => {
@@ -1820,7 +1929,7 @@ export default function StudyPage() {
                   <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform duration-200 ${col.ch} ${isOpen ? "rotate-180" : ""}`} />
                 </button>
                 {isOpen && (
-                  <div className="px-4 pb-4">
+                  <div className="px-3 sm:px-4 pb-4">
                     {sec.blocks.map((b, bi) => <Block key={bi} b={b} dot={col.dot} />)}
                   </div>
                 )}
@@ -1829,14 +1938,14 @@ export default function StudyPage() {
           })}
         </div>
 
-        <div className="mt-8 pt-6 border-t border-slate-800 flex flex-col sm:flex-row gap-3">
+        <div className="mt-6 sm:mt-8 pt-5 sm:pt-6 border-t border-gray-200 dark:border-slate-800 flex flex-col sm:flex-row gap-3">
           <button onClick={() => navigate("/exam")}
             className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl transition-all text-sm">
             <Star className="w-4 h-4" /> Test Yourself
           </button>
           {selected < TOPICS.length - 1 && (
             <button onClick={() => selectTopic(selected + 1)}
-              className="flex-1 flex items-center justify-center gap-2 border border-slate-700 text-slate-300 hover:bg-slate-800 py-2.5 rounded-xl transition-all text-sm">
+              className="flex-1 flex items-center justify-center gap-2 border border-gray-300 dark:border-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 py-2.5 rounded-xl transition-all text-sm">
               Next Topic <ChevronRight className="w-4 h-4" />
             </button>
           )}
