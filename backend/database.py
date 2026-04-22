@@ -98,8 +98,13 @@ def init_db():
 
 
 def _row(row) -> dict:
+    import datetime as _dt
     d = dict(row)
     d["followups"] = json.loads(d["followups"])
+    # Convert datetime fields to ISO strings so dicts are JSON-serializable
+    for k, v in d.items():
+        if isinstance(v, (_dt.datetime, _dt.date)):
+            d[k] = v.isoformat()
     return d
 
 
@@ -299,9 +304,13 @@ def next_id_for_topic(topic_number: int) -> str:
 # ── Exam Sessions ──────────────────────────────────────────────────────────
 
 def _session_row(row) -> dict:
+    import datetime as _dt
     d = dict(row)
     d["questions"] = json.loads(d["questions"])
     d["answers"] = json.loads(d["answers"])
+    for k, v in d.items():
+        if isinstance(v, (_dt.datetime, _dt.date)):
+            d[k] = v.isoformat()
     return d
 
 
