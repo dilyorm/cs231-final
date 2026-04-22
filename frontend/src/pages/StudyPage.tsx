@@ -1,1012 +1,1771 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, BookOpen, ChevronRight, ChevronDown, Star } from "lucide-react";
+import { ArrowLeft, BookOpen, ChevronRight, ChevronDown, Star, AlertTriangle } from "lucide-react";
 
-interface Section {
-  heading: string;
-  color: string;
-  icon: string;
-  items: string[];
-}
+type Block =
+  | { t: "p"; c: string }
+  | { t: "code"; c: string; label?: string }
+  | { t: "dia"; c: string; label?: string }
+  | { t: "table"; h: string[]; r: string[][] }
+  | { t: "list"; items: string[] }
+  | { t: "warn"; items: string[] };
 
-interface TopicData {
-  number: number;
-  short: string;
-  title: string;
-  overview: string;
-  sections: Section[];
-}
+interface Section { heading: string; icon: string; color: string; blocks: Block[] }
+interface Topic { number: number; short: string; title: string; overview: string; sections: Section[] }
 
-const COLORS: Record<string, { section: string; badge: string; dot: string; chevron: string }> = {
-  indigo: { section: "bg-indigo-950/30 border-indigo-500/20", badge: "text-indigo-300", dot: "bg-indigo-400", chevron: "text-indigo-500" },
-  violet: { section: "bg-violet-950/30 border-violet-500/20", badge: "text-violet-300", dot: "bg-violet-400", chevron: "text-violet-500" },
-  amber:  { section: "bg-amber-950/30 border-amber-500/20",   badge: "text-amber-300",  dot: "bg-amber-400",  chevron: "text-amber-500"  },
-  red:    { section: "bg-red-950/30 border-red-500/20",       badge: "text-red-300",    dot: "bg-red-400",    chevron: "text-red-500"    },
+const C = {
+  indigo: { card: "bg-indigo-950/30 border-indigo-500/20", badge: "text-indigo-300", ch: "text-indigo-500", dot: "bg-indigo-400" },
+  violet: { card: "bg-violet-950/30 border-violet-500/20", badge: "text-violet-300", ch: "text-violet-500", dot: "bg-violet-400" },
+  amber:  { card: "bg-amber-950/30  border-amber-500/20",  badge: "text-amber-300",  ch: "text-amber-500",  dot: "bg-amber-400"  },
+  red:    { card: "bg-red-950/30    border-red-500/20",    badge: "text-red-300",    ch: "text-red-500",    dot: "bg-red-400"    },
 };
 
-const TOPICS: TopicData[] = [
+function Block({ b, dot }: { b: Block; dot: string }) {
+  if (b.t === "p") return <p className="text-slate-300 text-sm leading-relaxed mb-2">{b.c}</p>;
+  if (b.t === "list") return (
+    <ul className="space-y-1.5 mb-2">
+      {b.items.map((item, i) => (
+        <li key={i} className="flex items-start gap-2">
+          <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 mt-[7px] ${dot}`} />
+          <span className="text-slate-300 text-sm leading-relaxed">{item}</span>
+        </li>
+      ))}
+    </ul>
+  );
+  if (b.t === "code") return (
+    <div className="mb-3">
+      {b.label && <div className="text-xs text-slate-500 mb-1 font-mono">{b.label}</div>}
+      <pre className="bg-slate-900 border border-slate-700/60 rounded-lg p-3 text-xs text-amber-200 font-mono overflow-x-auto leading-relaxed whitespace-pre">{b.c}</pre>
+    </div>
+  );
+  if (b.t === "dia") return (
+    <div className="mb-3">
+      {b.label && <div className="text-xs text-slate-500 mb-1">{b.label}</div>}
+      <pre className="bg-slate-950 border border-emerald-900/40 rounded-lg p-3 text-xs text-emerald-300 font-mono overflow-x-auto leading-relaxed whitespace-pre">{b.c}</pre>
+    </div>
+  );
+  if (b.t === "table") return (
+    <div className="mb-3 overflow-x-auto">
+      <table className="w-full text-xs border-collapse">
+        <thead>
+          <tr>{b.h.map((h, i) => <th key={i} className="border border-slate-700 bg-slate-800 px-2 py-1.5 text-slate-300 text-left font-semibold">{h}</th>)}</tr>
+        </thead>
+        <tbody>
+          {b.r.map((row, i) => (
+            <tr key={i} className={i % 2 === 0 ? "bg-slate-900/50" : "bg-slate-800/20"}>
+              {row.map((cell, j) => <td key={j} className="border border-slate-700/40 px-2 py-1.5 text-slate-300 font-mono">{cell}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+  if (b.t === "warn") return (
+    <div className="mb-2 bg-red-950/40 border border-red-500/25 rounded-lg p-3">
+      <div className="flex items-center gap-1.5 mb-2">
+        <AlertTriangle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+        <span className="text-xs font-bold text-red-400">EXAM TRAPS</span>
+      </div>
+      <ul className="space-y-1.5">
+        {b.items.map((item, i) => (
+          <li key={i} className="flex items-start gap-2">
+            <span className="text-red-500 text-xs flex-shrink-0 mt-0.5">→</span>
+            <span className="text-red-200 text-xs leading-relaxed">{item}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+  return null;
+}
+
+const TOPICS: Topic[] = [
+  // ─────────────────────────────────────────────────────────── TOPIC 1
   {
     number: 1, short: "Binary & Endianness",
     title: "Topic 1 – Binary Representation, Byte Memory & Byte Ordering",
-    overview: "All data is binary. Memory is byte-addressable — each address holds exactly 1 byte. Multi-byte values have two possible layouts: big-endian or little-endian. x86/x86-64 is little-endian.",
+    overview: "Every piece of data a computer handles — integers, floats, characters, instructions — is stored as binary digits. Understanding how numbers are represented in different bases and how multi-byte values are laid out in memory is the foundation for everything else in this course.",
     sections: [
-      { heading: "Number Systems", color: "indigo", icon: "🔢", items: [
-        "Binary (base-2): 11101101₂ = 128+64+32+0+8+4+0+1 = 237₁₀",
-        "Hex (base-16): digits 0–9, A–F. 1 hex digit = 4 bits (nibble). 0xED = 14×16+13 = 237₁₀",
-        "Binary↔Hex: group bits in 4s from right. 1110|1101 → E|D → 0xED",
-        "1 byte = 8 bits = 2 hex digits. int(32-bit) = 4 bytes = 8 hex digits.",
-        "Decimal→Binary: divide by 2 repeatedly, collect remainders bottom-up.",
-        "Decimal→Hex: divide by 16 repeatedly, or convert via binary (group by 4).",
+      { heading: "Number Systems", icon: "🔢", color: "indigo", blocks: [
+        { t: "p", c: "Computers use binary (base-2) internally because transistors have two stable states: on/off. We use hex (base-16) as a compact human-readable shorthand — every 4 bits maps exactly to one hex digit." },
+        { t: "dia", label: "Bit positions in one byte:", c:
+`Bit #:   7    6    5    4    3    2    1    0
+Weight: 128   64   32   16    8    4    2    1
+
+Example: 11101101₂
+         1×128 + 1×64 + 1×32 + 0×16 + 1×8 + 1×4 + 0×2 + 1×1 = 237₁₀ = 0xED` },
+        { t: "p", c: "Binary↔Hex conversion: group bits in 4 from the right. Each group of 4 bits becomes one hex digit." },
+        { t: "dia", label: "Binary ↔ Hex:", c:
+`1110  1101
+ ↓       ↓
+ E       D    →  0xED
+
+Hex digits: 0-9, A=10, B=11, C=12, D=13, E=14, F=15` },
+        { t: "table", h: ["Type", "Bits", "Hex digits", "Range"], r: [
+          ["byte", "8", "2", "0–255"],
+          ["word (x86)", "16", "4", "0–65535"],
+          ["dword", "32", "8", "0–4294967295"],
+          ["qword", "64", "16", "0–2⁶⁴-1"],
+        ]},
       ]},
-      { heading: "Byte-Oriented Memory", color: "violet", icon: "🧠", items: [
-        "Each memory address identifies exactly 1 byte. CPU issues byte-level addresses.",
-        "Word size = natural integer/pointer size: x86 → 32-bit (4B), x86-64 → 64-bit (8B).",
-        "32-bit CPU: max 2³² = 4 GB directly addressable.",
-        "64-bit CPU (x86-64): 48-bit virtual addresses → 256 TB user space.",
-        "sizeof(void*) = word size. On x86-64 = 8 bytes.",
-        "char=1B, short=2B, int=4B, long(Linux 64-bit)=8B, long long=8B, float=4B, double=8B.",
+      { heading: "Byte-Oriented Memory", icon: "🧠", color: "violet", blocks: [
+        { t: "p", c: "Memory is an array of bytes. Every byte has a unique address. The CPU generates byte addresses. A 32-bit CPU can address 2³² = 4 GB. A 64-bit CPU theoretically 2⁶⁴ bytes, but x86-64 uses only 48-bit addresses (256 TB) in practice." },
+        { t: "table", h: ["Type", "Size", "x86-64 sizeof"], r: [
+          ["char", "1 byte", "1"],
+          ["short", "2 bytes", "2"],
+          ["int", "4 bytes", "4"],
+          ["long", "8 bytes (Linux 64-bit)", "8"],
+          ["pointer (void*)", "word size", "8"],
+          ["double", "8 bytes", "8"],
+        ]},
       ]},
-      { heading: "Byte Ordering (Endianness)", color: "amber", icon: "🔄", items: [
-        "Big-endian: MSB at lowest address. 0x12345678 at 0x100 → [12][34][56][78]",
-        "Little-endian: LSB at lowest address. x86 is little-endian. → [78][56][34][12]",
-        "Network byte order = big-endian. htonl()/ntohl() for 32-bit, htons()/ntohs() for 16-bit.",
-        "Detect at runtime: union{int i; char c[4];}u={1}; if(u.c[0]==1) → little-endian.",
-        "String bytes NOT reordered (each char = 1 byte; endianness only affects multi-byte values).",
-      ]},
-      { heading: "Exam Traps", color: "red", icon: "⚠️", items: [
-        "Little-endian: address 0x100 holds the LEAST significant byte of a multi-byte value.",
-        "Writing to EAX zero-extends upper 32 bits of RAX. Writing to AX does NOT touch upper bits.",
-        "nibble=4 bits, byte=8 bits, word=2B (x86 term), DWORD=4B, QWORD=8B.",
-        "Endianness only matters for multi-byte values in memory. Single bytes are unaffected.",
-        "C: sizeof('A')=1 (char). sizeof(\"A\")=2 (char + null terminator).",
+      { heading: "Byte Ordering (Endianness)", icon: "🔄", color: "amber", blocks: [
+        { t: "p", c: "When a multi-byte value is stored in memory, which byte comes first? There are two conventions. x86 and x86-64 use little-endian. Network protocols use big-endian (called 'network byte order')." },
+        { t: "dia", label: "Storing 0x12345678 at address 0x100:", c:
+`Address:      0x100  0x101  0x102  0x103
+              ┌──────┬──────┬──────┬──────┐
+Big-endian:   │ 0x12 │ 0x34 │ 0x56 │ 0x78 │  MSB at lowest addr
+              └──────┴──────┴──────┴──────┘
+              ┌──────┬──────┬──────┬──────┐
+Little-endian:│ 0x78 │ 0x56 │ 0x34 │ 0x12 │  LSB at lowest addr (x86!)
+              └──────┴──────┴──────┴──────┘` },
+        { t: "p", c: "To convert between host and network byte order, use htonl()/ntohl() for 32-bit integers, htons()/ntohs() for 16-bit. These are no-ops on big-endian hosts." },
+        { t: "code", label: "Detect endianness at runtime:", c:
+`union { uint32_t i; uint8_t c[4]; } u = { .i = 1 };
+if (u.c[0] == 1) puts("little-endian");  // x86: true
+else             puts("big-endian");` },
+        { t: "warn", items: [
+          "Little-endian: address 0x100 holds the LEAST significant byte. What you see in a hex dump is bytes in address order — looks 'reversed' vs the integer value.",
+          "Single bytes are unaffected by endianness. String characters are NOT reordered.",
+          "Writing to EAX zero-extends the upper 32 bits of RAX. Writing to AX does NOT touch upper bits.",
+        ]},
       ]},
     ],
   },
+
+  // ─────────────────────────────────────────────────────────── TOPIC 2
   {
     number: 2, short: "Integer Encoding",
     title: "Topic 2 – Encoding Integers & Integer Arithmetic",
-    overview: "Unsigned integers are pure binary. Signed integers use two's complement. Overflow wraps silently. Two's complement negation: flip bits + 1. Division requires sign-extension setup.",
+    overview: "Unsigned integers are raw binary. Signed integers use two's complement — the universal standard. Overflow is silent and wraps modulo 2ⁿ. Division requires careful setup of RDX before IDIV.",
     sections: [
-      { heading: "Unsigned & Two's Complement", color: "indigo", icon: "🔢", items: [
-        "Unsigned n-bit: range 0 to 2ⁿ-1. All bit patterns non-negative.",
-        "Two's complement n-bit: range -2^(n-1) to 2^(n-1)-1. MSB has weight -2^(n-1).",
-        "8-bit unsigned: 0–255. 8-bit signed: -128–127.",
-        "Negation: flip all bits + 1. E.g. 5=00000101 → 11111010+1=11111011=-5.",
-        "Key identity: -x = ~x + 1. Also: ~x = -x - 1.",
-        "Sign extension: copy MSB into all new upper bits. Zero extension: fill upper bits with 0.",
-        "Casting unsigned↔signed in C keeps bit pattern, reinterprets meaning.",
+      { heading: "Unsigned & Two's Complement", icon: "🔢", color: "indigo", blocks: [
+        { t: "p", c: "Two's complement is elegant: the same hardware adder works for both signed and unsigned arithmetic. The MSB has negative weight (-2^(n-1)), all others positive." },
+        { t: "dia", label: "8-bit two's complement:", c:
+`Bit pattern │ Unsigned │ Signed (two's complement)
+────────────┼──────────┼──────────────────────────
+0000 0000   │    0     │    0
+0000 0001   │    1     │    1
+0111 1111   │   127    │  127  ← max positive
+1000 0000   │   128    │ -128  ← min (most negative!)
+1111 1110   │   254    │   -2
+1111 1111   │   255    │   -1  ← all ones = -1` },
+        { t: "p", c: "Negation rule: flip all bits, then add 1. This works because x + ~x = 0xFFF...F = -1, so ~x = -x - 1, so -x = ~x + 1." },
+        { t: "dia", label: "Negating 5:", c:
+` 5  =  0000 0101
+~5  =  1111 1010   (flip all bits)
+-5  =  1111 1011   (add 1)
+
+Check: 5 + (-5) = 0000 0101
+                + 1111 1011
+               = 1 0000 0000  → discard carry → 0000 0000 ✓` },
+        { t: "p", c: "Sign extension: when widening a signed integer (e.g. int8→int32), copy the MSB (sign bit) into all new upper bits. Zero extension fills upper bits with 0 and is used for unsigned widening." },
       ]},
-      { heading: "Arithmetic & Overflow", color: "violet", icon: "➕", items: [
-        "Addition mod 2ⁿ: same bit operation for unsigned and signed.",
-        "Unsigned overflow: result > 2ⁿ-1 → wraps. Carry Flag (CF) set.",
-        "Signed overflow: both operands same sign, result opposite sign. Overflow Flag (OF) set.",
-        "Arithmetic right shift (SAR): fills with sign bit. Signed divide by 2^k (rounds toward -∞).",
-        "Logical right shift (SHR): fills with 0. Unsigned divide by 2^k.",
-        "Left shift SHL by k = multiply by 2^k (unsigned and signed).",
-        "MUL (unsigned): full result in RDX:RAX. IMUL (signed): same for 1-operand form.",
-        "IDIV: dividend in RDX:RAX. Quotient→RAX, Remainder→RDX. CDQ before 32-bit, CQO before 64-bit.",
+      { heading: "Arithmetic & Overflow", icon: "➕", color: "violet", blocks: [
+        { t: "p", c: "Addition/subtraction is identical for unsigned and signed at the bit level — only interpretation differs. Overflow means the true result doesn't fit." },
+        { t: "dia", label: "Overflow detection:", c:
+`Unsigned overflow: carry out of MSB (CF flag set)
+  200 + 100 = 300, but 300 > 255 → wraps to 44
+
+Signed overflow: both operands same sign, result opposite (OF flag)
+  127 + 1 = 128, but 128 > 127 → wraps to -128` },
+        { t: "p", c: "Shifts are used for fast multiplication/division by powers of 2. Arithmetic right shift (SAR) preserves the sign bit for signed division. Logical right shift (SHR) fills with 0 for unsigned." },
+        { t: "table", h: ["Operation", "Instruction", "Effect", "When to use"], r: [
+          ["×2ᵏ", "SHL dst, k", "shift left, fill 0 (LSB)", "always"],
+          ["÷2ᵏ (unsigned)", "SHR dst, k", "shift right, fill 0 (MSB)", "unsigned only"],
+          ["÷2ᵏ (signed)", "SAR dst, k", "shift right, fill sign bit", "signed only"],
+        ]},
+        { t: "p", c: "For integer division, IDIV takes its dividend from RDX:RAX (128-bit). You must sign-extend RAX into RDX first using CDQ (32-bit) or CQO (64-bit)." },
+        { t: "code", label: "64-bit signed division: RAX = RAX ÷ RBX", c:
+`mov  rax, -100   ; dividend
+cqo               ; sign-extend RAX → RDX:RAX (CQO required!)
+mov  rbx, 7
+idiv rbx          ; RAX = quotient (-14), RDX = remainder (-2)` },
+        { t: "warn", items: [
+          "INT_MIN negation overflows: -(-2147483648) = -2147483648 in 32-bit two's complement.",
+          "Casting signed -1 to unsigned 32-bit = 4294967295 (0xFFFFFFFF). Bit pattern unchanged.",
+          "IDIV without CDQ/CQO: RDX has garbage → wrong quotient or #DE exception.",
+          "SAR rounds toward -∞, not 0. SAR of -9 by 1 = -5, but -9/2 in C = -4.",
+          "INC and DEC do NOT modify CF. Use ADD 1 / SUB 1 if you need CF.",
+        ]},
       ]},
-      { heading: "Bit Operations", color: "amber", icon: "⚙️", items: [
-        "AND: mask bits. x & 0xFF → lower byte only.",
-        "OR: set bits. x | 0x01 → force LSB to 1.",
-        "XOR: toggle. x ^ x = 0. XOR eax,eax fastest way to zero register.",
-        "NOT: flip all bits. ~0 = -1 (signed), 0xFFFFFFFF (unsigned 32-bit). Does NOT set flags.",
-        "Test bit k: (x >> k) & 1. Set bit k: x | (1<<k). Clear: x & ~(1<<k). Toggle: x ^ (1<<k).",
-        "Isolate lowest set bit: x & (-x).",
-      ]},
-      { heading: "Exam Traps", color: "red", icon: "⚠️", items: [
-        "INT_MIN negation overflows: -(-2147483648) = -2147483648 in two's complement.",
-        "Casting signed -1 to uint32 = 4294967295. Bit pattern unchanged.",
-        "IDIV requires CDQ/CQO first or RDX contains garbage → wrong quotient.",
-        "SAR -9,1 = -5 (rounds toward -∞, not toward 0). Different from C integer division.",
-        "Shift by ≥ word size: undefined behavior in C (e.g. 1U<<32 on 32-bit int).",
-        "INC/DEC do NOT set CF. ADD/SUB do.",
+      { heading: "Bit Manipulation", icon: "⚙️", color: "amber", blocks: [
+        { t: "table", h: ["Goal", "Expression", "Note"], r: [
+          ["Test bit k", "(x >> k) & 1", "or: x & (1<<k)"],
+          ["Set bit k", "x | (1<<k)", ""],
+          ["Clear bit k", "x & ~(1<<k)", ""],
+          ["Toggle bit k", "x ^ (1<<k)", ""],
+          ["Isolate lowest set bit", "x & (-x)", "x & ~x+1"],
+          ["Clear lowest set bit", "x & (x-1)", "useful for popcount loops"],
+          ["Zero register", "XOR eax,eax", "faster than MOV eax,0"],
+        ]},
       ]},
     ],
   },
+
+  // ─────────────────────────────────────────────────────────── TOPIC 3
   {
     number: 3, short: "Floating Point",
     title: "Topic 3 – IEEE 754 Floating Point & Rounding",
-    overview: "IEEE 754: sign + biased exponent + mantissa. float=32-bit (bias 127), double=64-bit (bias 1023). Special values: ±0, ±∞, NaN, denormals. Default rounding = round-to-even.",
+    overview: "IEEE 754 represents real numbers as sign × mantissa × 2^exponent. The exponent is biased (stored offset from a fixed bias). Special bit patterns encode ±0, ±∞, NaN, and denormals. Arithmetic is NOT associative.",
     sections: [
-      { heading: "IEEE 754 Structure", color: "indigo", icon: "🔬", items: [
-        "Format: (-1)^s × M × 2^E. s=sign, M=mantissa, E=exponent.",
-        "float (32-bit): 1 sign | 8 exponent | 23 mantissa. Bias=127. E=exp_bits-127.",
-        "double (64-bit): 1 sign | 11 exponent | 52 mantissa. Bias=1023.",
-        "Normalized: exp_bits ≠ 0 and ≠ all-1s. Implicit leading 1: M = 1.mantissa_bits.",
-        "float exponent range: -126 to +127. Precision: ~7 decimal digits.",
-        "double precision: ~15 decimal digits. float range: ~±3.4×10³⁸.",
-        "Example: -6.5 = -1.101₂ × 2². s=1, exp=129=10000001, mantissa=10100...0",
+      { heading: "IEEE 754 Structure", icon: "🔬", color: "indigo", blocks: [
+        { t: "dia", label: "float (32-bit):", c:
+` 31  30        23 22                     0
+ ┌───┬──────────┬───────────────────────┐
+ │ S │ Exponent │       Mantissa        │
+ │ 1b│  8 bits  │       23 bits         │
+ └───┴──────────┴───────────────────────┘
+        bias = 127
+
+double (64-bit):
+ 63  62           52 51                  0
+ ┌───┬─────────────┬────────────────────┐
+ │ S │  Exponent   │      Mantissa      │
+ │ 1b│   11 bits   │      52 bits       │
+ └───┴─────────────┴────────────────────┘
+          bias = 1023` },
+        { t: "p", c: "Normalized numbers have an implicit leading 1 in the mantissa: M = 1.fraction. The actual value is: (-1)^S × 1.mantissa × 2^(exponent_bits - bias). This gives float precision of ~7 decimal digits, double ~15." },
+        { t: "dia", label: "Encoding -6.5:", c:
+`-6.5 = -1.101₂ × 2²
+
+S = 1
+Exponent: 2 + 127 = 129 = 1000_0001₂
+Mantissa: 101_0000_0000_0000_0000_0000 (drop implicit 1.)
+
+Result: 1 10000001 10100000000000000000000
+Hex:    0xC0D00000` },
       ]},
-      { heading: "Special Values & Denormals", color: "violet", icon: "∞", items: [
-        "±0: exp=0, mantissa=0. +0 == -0 but 1/+0=+∞, 1/-0=-∞.",
-        "±∞: exp=all-1s, mantissa=0. Produced by overflow or div by zero.",
-        "NaN: exp=all-1s, mantissa≠0. Any comparison with NaN is false (except !=).",
-        "Denormal (subnormal): exp_bits=0, mantissa≠0. No implicit leading 1. E=-126 (float).",
-        "Denormals fill the gap near 0 (gradual underflow). Slower on many CPUs.",
-        "Smallest positive normalized float: 2^-126 ≈ 1.18×10⁻³⁸.",
+      { heading: "Special Values & Denormals", icon: "∞", color: "violet", blocks: [
+        { t: "table", h: ["Exp bits", "Mantissa", "Value", "Notes"], r: [
+          ["00000000", "0", "±0", "+0 == -0, but 1/+0=+∞, 1/-0=-∞"],
+          ["00000000", "≠0", "Denormal", "No implicit 1, E=-126 (float)"],
+          ["11111111", "0", "±∞", "Overflow or div by zero"],
+          ["11111111", "≠0", "NaN", "Invalid op. x!=x is true!"],
+          ["1–254", "any", "Normal", "Implicit 1. Bias applied"],
+        ]},
+        { t: "p", c: "Denormals (subnormals) fill the gap near zero with gradually less precise numbers. They have exponent bits = 0 but the actual exponent E = -126 (not -127), and no implicit leading 1. Many CPUs run much slower on denormals — some flush them to zero (FTZ mode)." },
       ]},
-      { heading: "Rounding & Arithmetic", color: "amber", icon: "🔄", items: [
-        "Round-to-even (default): ties round to nearest even. 2.5→2, 3.5→4.",
-        "Other modes: truncate (toward 0), ceiling (toward +∞), floor (toward -∞).",
-        "Float arithmetic is NOT associative: (a+b)+c ≠ a+(b+c) due to rounding.",
-        "NOT distributive: a×(b+c) ≠ a×b + a×c.",
-        "int→float: exact if |int| < 2²⁴ (23 mantissa bits). Larger ints lose low bits.",
-        "double→float: loses precision. float→double: safe (widening).",
-        "FMA (fused multiply-add): computes a×b+c with single rounding. More accurate.",
-      ]},
-      { heading: "Exam Traps", color: "red", icon: "⚠️", items: [
-        "NaN != NaN is TRUE. Only reliable check: isnan(x) or x != x.",
-        "0.1 cannot be represented exactly in binary float — it repeats infinitely.",
-        "Overflow → ±∞ (not UB for floats, unlike signed integer overflow in C).",
-        "Denormals: exp_bits=0 but E=-126 (not -127). No implicit leading 1.",
-        "16777217 (2²⁴+1) rounds to 16777216 as float — loses low bit.",
-        "Comparing floats with == almost always wrong. Use fabs(a-b) < epsilon.",
+      { heading: "Rounding & Arithmetic Pitfalls", icon: "🔄", color: "amber", blocks: [
+        { t: "p", c: "IEEE 754 default rounding is round-to-even (banker's rounding): ties are broken by rounding to the nearest even mantissa. This minimizes cumulative bias in long computations." },
+        { t: "dia", label: "Round-to-even examples:", c:
+`2.5 → 2  (2 is even)
+3.5 → 4  (4 is even)
+4.5 → 4  (4 is even)
+5.5 → 6  (6 is even)` },
+        { t: "p", c: "Float arithmetic is NOT associative due to rounding at each step. This breaks many assumptions from real arithmetic." },
+        { t: "code", label: "Classic pitfalls:", c:
+`// Associativity failure
+(1e30 + -1e30) + 1.0  =  0.0 + 1.0  =  1.0
+ 1e30 + (-1e30 + 1.0) =  1e30 + 1.0  =  1e30  ← catastrophic cancellation
+
+// Equality failure
+0.1 + 0.2 == 0.3  →  FALSE  (0.30000000000000004 ≠ 0.3)
+
+// Correct float comparison:
+fabs(a - b) < 1e-9` },
+        { t: "warn", items: [
+          "NaN != NaN is TRUE. The only reliable NaN check: isnan(x) or x != x.",
+          "0.1 has no exact binary representation — it's a repeating binary fraction.",
+          "int 16777217 (2²⁴+1) rounds to 16777216.0f — loses the low bit (only 23 mantissa bits).",
+          "Denormals: exp_bits=0 but E=-126 for float (not -127). No implicit leading 1.",
+          "Float overflow → ±∞ (not undefined behavior). Integer overflow → UB in C.",
+        ]},
       ]},
     ],
   },
+
+  // ─────────────────────────────────────────────────────────── TOPIC 4
   {
     number: 4, short: "x86/x64 Registers",
-    title: "Topic 4 – Intel x86 / x64 Processors & Register File",
-    overview: "x86 (IA-32): 8 × 32-bit GPRs. x86-64: 16 × 64-bit GPRs. Writing a 32-bit sub-register zero-extends the upper 32 bits. RFLAGS tracks arithmetic results. RSP = stack pointer.",
+    title: "Topic 4 – Intel x86/x64 Processors & Register File",
+    overview: "x86 (IA-32) provides 8 × 32-bit GPRs. x86-64 extends to 16 × 64-bit GPRs and makes the ABI cleaner. Each 64-bit register has 32/16/8-bit sub-registers. Writing the 32-bit form zero-extends the full 64-bit register.",
     sections: [
-      { heading: "CPU Architecture", color: "indigo", icon: "💻", items: [
-        "CISC: variable-length instructions (1–15 bytes). Complex addressing modes.",
-        "x86 (IA-32): 32-bit mode, max 4 GB RAM, 8 GPRs.",
-        "x86-64 (AMD64): 64-bit, backward compatible, 16 GPRs. AMD introduced 2003, Intel adopted.",
-        "Rings: ring 0 = kernel (supervisor), ring 3 = user mode. x86 has 4 rings; Linux uses 0 and 3.",
-        "Pipelining: fetch → decode → execute → writeback. Modern CPUs out-of-order, superscalar.",
+      { heading: "Register Hierarchy", icon: "📋", color: "indigo", blocks: [
+        { t: "dia", label: "RAX register aliases:", c:
+` 63                              0
+ ┌─────────────────────────────────┐
+ │              RAX               │  64-bit
+ └─────────────────────────────────┘
+                  ┌────────────────┐
+                  │      EAX      │  32-bit (writing zeroes upper 32!)
+                  └────────────────┘
+                          ┌────────┐
+                          │   AX  │  16-bit (writing does NOT touch upper)
+                          └────────┘
+                          ┌────┬───┐
+                          │ AH │AL │  8-bit halves of AX
+                          └────┴───┘` },
+        { t: "table", h: ["64-bit", "32-bit", "16-bit", "8-bit high", "8-bit low", "Purpose"], r: [
+          ["RAX", "EAX", "AX", "AH", "AL", "Return value / accumulator"],
+          ["RBX", "EBX", "BX", "BH", "BL", "Callee-saved general"],
+          ["RCX", "ECX", "CX", "CH", "CL", "4th arg / counter / shift count"],
+          ["RDX", "EDX", "DX", "DH", "DL", "3rd arg / MUL-DIV high bits"],
+          ["RSI", "ESI", "SI", "-", "SIL", "2nd arg / source index"],
+          ["RDI", "EDI", "DI", "-", "DIL", "1st arg / dest index"],
+          ["RBP", "EBP", "BP", "-", "BPL", "Stack frame base (callee-saved)"],
+          ["RSP", "ESP", "SP", "-", "SPL", "Stack pointer"],
+          ["R8–R15", "R8D–R15D", "R8W–R15W", "-", "R8B–R15B", "5th-6th args + general"],
+        ]},
       ]},
-      { heading: "Register File", color: "violet", icon: "📋", items: [
-        "64-bit GPRs: RAX RBX RCX RDX RSI RDI RBP RSP R8 R9 R10 R11 R12 R13 R14 R15",
-        "RAX aliases: EAX(32b) AX(16b) AH(bits 8-15) AL(bits 0-7).",
-        "Writing EAX zero-extends RAX upper 32 bits. Writing AX does NOT change upper 48 bits.",
-        "RSP = stack pointer (top of stack). RBP = base pointer (frame base). RIP = instruction pointer.",
-        "R8–R15 sub-regs: R8D(32b), R8W(16b), R8B(8b).",
-        "Caller-saved (volatile): RAX RCX RDX RSI RDI R8–R11.",
-        "Callee-saved (preserved): RBX RBP R12–R15.",
-        "XMM0–XMM15: 128-bit registers for SSE/AVX float ops.",
-      ]},
-      { heading: "RFLAGS & Condition Codes", color: "amber", icon: "🚦", items: [
-        "CF (Carry): unsigned overflow/borrow.",
-        "ZF (Zero): result == 0.",
-        "SF (Sign): MSB of result (1 = negative in two's complement).",
-        "OF (Overflow): signed overflow (sign of result is wrong).",
-        "CMP a,b: computes a-b, sets flags, discards result.",
-        "TEST a,b: computes a AND b, sets flags, discards result.",
-        "NOT does NOT set flags. INC/DEC do NOT set CF.",
-      ]},
-      { heading: "Exam Traps", color: "red", icon: "⚠️", items: [
-        "MOV EAX,1 zeros upper 32 bits of RAX silently. MOV AX,1 does NOT.",
-        "INC/DEC preserve CF — use ADD/SUB if CF needed.",
-        "RSP must be 16-byte aligned BEFORE CALL (System V ABI). CALL pushes 8B → misaligned inside.",
-        "RIP cannot be used directly as GPR. RIP-relative addressing: [RIP+offset].",
-        "RFLAGS IF bit: controls whether maskable interrupts accepted. CLI/STI instructions.",
+      { heading: "RFLAGS & Condition Codes", icon: "🚦", color: "violet", blocks: [
+        { t: "p", c: "RFLAGS is a 64-bit register where individual bits record properties of the last arithmetic result. Conditional jump instructions read these bits." },
+        { t: "table", h: ["Flag", "Bit", "Set when", "Used by"], r: [
+          ["CF", "0", "Unsigned overflow / borrow", "JB, JA (unsigned jumps)"],
+          ["ZF", "6", "Result == 0", "JE, JNE"],
+          ["SF", "7", "Result MSB = 1 (negative)", "JL, JG (signed jumps)"],
+          ["OF", "11", "Signed overflow", "JL (SF≠OF), JG (SF=OF)"],
+          ["PF", "2", "Even number of 1-bits in low byte", "Rare"],
+        ]},
+        { t: "p", c: "CMP a,b computes a−b and sets flags without storing the result. TEST a,b computes a AND b and sets flags without storing. Use TEST for checking if a register is zero." },
+        { t: "code", c:
+`cmp  rax, rbx    ; sets flags based on rax-rbx
+je   equal        ; jump if ZF=1 (rax == rbx)
+
+test rax, rax     ; sets ZF=1 if rax==0
+jz   is_zero      ; jump if zero
+
+test rax, 1       ; check LSB
+jnz  is_odd` },
+        { t: "warn", items: [
+          "MOV EAX,1 silently zeros upper 32 bits of RAX. MOV AX,1 does NOT touch upper bits.",
+          "INC/DEC preserve CF — they do not set it. Use ADD reg,1 if you need CF.",
+          "RSP must be 16-byte aligned BEFORE the CALL instruction per System V ABI.",
+          "NOT instruction does not set any flags. NEG does.",
+        ]},
       ]},
     ],
   },
+
+  // ─────────────────────────────────────────────────────────── TOPIC 5
   {
     number: 5, short: "Assembly & Arithmetic",
     title: "Topic 5 – Assembly Language & Arithmetic Operations",
-    overview: "NASM uses Intel syntax: opcode dst, src. Arithmetic modifies RFLAGS. MUL/IMUL use RDX:RAX for full result. IDIV requires dividend in RDX:RAX with CDQ/CQO sign-extension.",
+    overview: "NASM uses Intel syntax: opcode dst, src (destination first). Each arithmetic instruction sets RFLAGS as a side effect. MUL/IMUL produce double-width results in RDX:RAX. Division requires explicit setup.",
     sections: [
-      { heading: "NASM Basics & Syntax", color: "indigo", icon: "📝", items: [
-        "Intel syntax (NASM): MOV dst, src — destination first. No register prefix.",
-        "AT&T syntax (GAS): movl src, dst — source first. Registers prefixed %.",
-        "Sections: section .text (code), .data (init data), .bss (uninit data).",
-        "global _start (Linux ELF) or global main (C linkage).",
-        "Comments: semicolon. ; this is a comment",
-        "Size specifiers: BYTE(1B), WORD(2B), DWORD(4B), QWORD(8B).",
-        "Memory access: [address]. MOV rax,[rbx] loads 8B at address in rbx.",
+      { heading: "NASM Syntax & Structure", icon: "📝", color: "indigo", blocks: [
+        { t: "code", label: "Minimal NASM program (Linux):", c:
+`section .data
+    msg db "Hello", 10     ; string + newline
+    len equ $ - msg        ; length constant
+
+section .bss
+    buf resb 64            ; reserve 64 uninitialized bytes
+
+section .text
+    global _start
+_start:
+    mov  rax, 1            ; syscall: write
+    mov  rdi, 1            ; fd: stdout
+    mov  rsi, msg          ; buffer address
+    mov  rdx, len          ; length
+    syscall
+    mov  rax, 60           ; syscall: exit
+    xor  rdi, rdi          ; exit code 0
+    syscall` },
+        { t: "p", c: "Intel syntax: destination always on the left. No % prefix on registers. No size suffix on mnemonics. Square brackets mean 'memory at this address': MOV rax,[rbx] reads 8 bytes from the address in rbx." },
       ]},
-      { heading: "Arithmetic Instructions", color: "violet", icon: "➕", items: [
-        "ADD dst,src → dst = dst+src. SUB dst,src → dst = dst-src. Both set CF ZF SF OF.",
-        "INC dst → dst++. DEC dst → dst--. NEG dst → dst = -dst (two's complement).",
-        "IMUL reg,src → signed. IMUL rax (1-op): RDX:RAX = RAX×rax.",
-        "IMUL dst,src,imm → dst = src×imm (3-op, no RDX involved).",
-        "MUL src → unsigned: RDX:RAX = RAX×src.",
-        "IDIV src → signed: CDQ/CQO first. Quotient→RAX, Remainder→RDX.",
-        "CDQ: sign-extends EAX into EDX:EAX (32-bit). CQO: sign-extends RAX into RDX:RAX (64-bit).",
-        "XCHG a,b: swap. Has implicit LOCK on memory operands.",
+      { heading: "Arithmetic Instructions", icon: "➕", color: "violet", blocks: [
+        { t: "table", h: ["Instruction", "Effect", "Flags set"], r: [
+          ["ADD dst, src", "dst = dst + src", "CF ZF SF OF PF"],
+          ["SUB dst, src", "dst = dst - src", "CF ZF SF OF PF"],
+          ["INC dst", "dst++", "ZF SF OF PF (not CF!)"],
+          ["DEC dst", "dst--", "ZF SF OF PF (not CF!)"],
+          ["NEG dst", "dst = -dst (two's complement)", "CF ZF SF OF"],
+          ["IMUL dst, src", "dst = dst × src (signed)", "CF OF"],
+          ["IMUL dst, src, imm", "dst = src × imm (signed, no RDX)", "CF OF"],
+          ["MUL src", "RDX:RAX = RAX × src (unsigned)", "CF OF"],
+          ["IDIV src", "RAX=quotient, RDX=remainder (signed)", "undefined"],
+          ["CDQ / CQO", "Sign-extend EAX→EDX:EAX / RAX→RDX:RAX", "none"],
+        ]},
+        { t: "code", label: "Division example — a/b and a%b:", c:
+`; int64 a in rax, b in rbx
+cqo           ; sign-extend rax into rdx:rax (MUST DO THIS)
+idiv rbx      ; rax = a/b (quotient), rdx = a%b (remainder)` },
       ]},
-      { heading: "Logical & Shift", color: "amber", icon: "⚙️", items: [
-        "AND dst,src — bitwise AND. OR dst,src — bitwise OR. XOR dst,src — bitwise XOR.",
-        "NOT dst — flip all bits. Does NOT set flags.",
-        "XOR reg,reg — fastest way to zero register (also zero-extends to full 64-bit if 32-bit).",
-        "SHL dst,count — shift left (fill 0). Multiply by 2^count.",
-        "SHR dst,count — logical shift right (fill 0). Unsigned divide by 2^count.",
-        "SAR dst,count — arithmetic shift right (fill sign bit). Signed divide by 2^count.",
-        "ROL/ROR — rotate left/right. Bits wrap around.",
-        "Count operand: immediate or CL register only.",
-      ]},
-      { heading: "Exam Traps", color: "red", icon: "⚠️", items: [
-        "IDIV — must CDQ/CQO first. Without it, RDX has garbage → wrong result.",
-        "NOT sets no flags. NEG sets ZF (result=0) and CF (always unless result=0).",
-        "XOR eax,eax zeros upper 32 bits of RAX (unlike MOV AX,0).",
-        "IMUL eax,ebx,5 → 3-op form, no RDX. IMUL eax (1-op) → RDX:EAX = EAX×EAX.",
-        "SAR arithmetic rounds toward -∞. C signed >> is implementation-defined.",
-        "MUL/IMUL 1-operand: full 128-bit result in RDX:RAX.",
+      { heading: "Logical & Shift", icon: "⚙️", color: "amber", blocks: [
+        { t: "code", c:
+`; Logical operations
+and  rax, 0xFF      ; mask: keep only low byte
+or   rax, 0x01      ; set LSB
+xor  rax, rax       ; zero register (faster than mov rax,0)
+not  rax            ; flip all bits (does NOT set flags)
+
+; Shifts
+shl  rax, 3         ; rax *= 8  (logical left)
+shr  rax, 3         ; rax /= 8  (logical right, unsigned)
+sar  rax, 3         ; rax /= 8  (arithmetic right, signed)
+rol  rax, 1         ; rotate left (bit wraps from MSB to LSB)
+
+; Count in CL for variable shifts
+mov  cl, 5
+shl  rax, cl        ; rax <<= 5` },
+        { t: "warn", items: [
+          "IDIV requires CDQ (32-bit) or CQO (64-bit) to sign-extend RAX into RDX first.",
+          "NOT sets no flags. NEG sets CF (always, unless result=0) and ZF.",
+          "XOR eax,eax is preferred over MOV eax,0 — shorter encoding AND zero-extends RAX.",
+          "SAR rounds toward -∞. In C, signed >> is implementation-defined, but x86 SAR is arithmetic.",
+          "Shift count ≥ word size: undefined in C (1U << 32 on 32-bit int is UB).",
+        ]},
       ]},
     ],
   },
+
+  // ─────────────────────────────────────────────────────────── TOPIC 6
   {
     number: 6, short: "Addressing & Control Flow",
     title: "Topic 6 – Addressing Modes, MOV/LEA, Jumps, Loops & Switch",
-    overview: "x86-64 addressing: base + index×scale + displacement. MOV loads values; LEA computes addresses without memory access. Conditional jumps use RFLAGS. Switch compiles to jump tables.",
+    overview: "x86-64 has one of the richest addressing modes of any architecture: base + index×scale + displacement. MOV reads from memory; LEA computes the address without reading memory. Conditional jumps use RFLAGS set by CMP/TEST.",
     sections: [
-      { heading: "Addressing Modes", color: "indigo", icon: "📍", items: [
-        "Immediate: MOV rax,42 — literal in instruction.",
-        "Register: MOV rax,rbx — from register.",
-        "Memory indirect: MOV rax,[rbx] — value at address in rbx.",
-        "Base+disp: MOV rax,[rbx+8] — struct field access.",
-        "Base+index×scale+disp: MOV rax,[rbx+rcx*8+16] — full form.",
-        "Scale must be 1, 2, 4, or 8. Index register cannot be RSP.",
-        "RIP-relative: [rel symbol] — position-independent code (64-bit).",
+      { heading: "Addressing Modes", icon: "📍", color: "indigo", blocks: [
+        { t: "dia", label: "Full addressing mode syntax: [base + index×scale + displacement]", c:
+`Immediate:        MOV rax, 42          ; literal 42
+Register:         MOV rax, rbx         ; value from rbx
+Memory indirect:  MOV rax, [rbx]       ; value AT address rbx
+Base + disp:      MOV rax, [rbx + 8]   ; struct field access
+Base + idx×scale: MOV rax, [rbx + rcx*8]
+Full form:        MOV rax, [rbx + rcx*8 + 16]
+
+Rules:
+  scale ∈ {1, 2, 4, 8} only
+  index register ≠ RSP
+  RIP-relative: [rel label]  (position-independent code)` },
       ]},
-      { heading: "MOV vs LEA", color: "violet", icon: "🏷️", items: [
-        "MOV rax,[expr] — loads VALUE from memory at computed address.",
-        "LEA rax,[expr] — loads COMPUTED ADDRESS itself. NO memory access.",
-        "LEA rax,[rbx+rcx*4+8] → rax = rbx+rcx×4+8. Pure integer arithmetic.",
-        "LEA common uses: fast multiply by non-power-of-2 (LEA rax,[rax+rax*2]=×3), address calc.",
-        "MOVZX: move with zero-extension. MOVSX: move with sign-extension.",
-        "MOV DWORD to 32-bit reg automatically zero-extends to 64-bit.",
+      { heading: "MOV vs LEA", icon: "🏷️", color: "violet", blocks: [
+        { t: "p", c: "This distinction trips up almost everyone. MOV [expr] dereferences memory — it reads or writes the value AT the computed address. LEA [expr] computes the address itself as an integer and stores it in the destination register. No memory is accessed." },
+        { t: "dia", c:
+`MOV rax, [rbx + rcx*4 + 8]
+   → reads 8 bytes from memory at address (rbx + rcx×4 + 8)
+   → rax = Memory[rbx + rcx×4 + 8]
+
+LEA rax, [rbx + rcx*4 + 8]
+   → computes the address arithmetic only, no memory access
+   → rax = rbx + rcx×4 + 8` },
+        { t: "code", label: "LEA tricks — fast multiply by non-power-of-2:", c:
+`lea rax, [rax + rax*2]    ; rax = rax * 3
+lea rax, [rax*5]           ; rax = rax * 5
+lea rax, [rbx + rax*8]    ; rax = rbx + rax*8
+
+; Also: address of local variable
+lea rdi, [rbp - 16]       ; pointer to local var, no memory read` },
       ]},
-      { heading: "Jumps, Loops & Switch", color: "amber", icon: "🔀", items: [
-        "JMP label — unconditional.",
-        "CMP a,b → flags from a-b. TEST a,b → flags from a AND b.",
-        "JE/JZ(ZF=1), JNE/JNZ(ZF=0), JL(SF≠OF), JG(ZF=0,SF=OF), JLE, JGE (signed).",
-        "JB/JNAE(CF=1), JA/JNBE(CF=0,ZF=0) — unsigned comparisons.",
-        "FOR: init; top: CMP count,limit; JGE done; body; INC count; JMP top.",
-        "WHILE: top: CMP; JGE done; body; JMP top. DO-WHILE: body; CMP; JL top.",
-        "LOOP: DEC RCX; JNZ label. Implicit counter in RCX.",
-        "SWITCH jump table: array of code addresses. JMP [table+rax*8]. Dense cases only.",
-      ]},
-      { heading: "Exam Traps", color: "red", icon: "⚠️", items: [
-        "LEA does NOT access memory — it only computes the address.",
-        "JL is signed (SF≠OF). JB is unsigned (CF=1). Wrong choice = wrong branch.",
-        "After CMP a,b: JL means a<b (signed). JB means a<b (unsigned).",
-        "LOOP: if RCX=0 before LOOP, decrements to 2⁶⁴-1 → runs 2⁶⁴ times.",
-        "Switch sparse cases: compiler uses chain of CMP+JE, not jump table.",
+      { heading: "Jumps, Loops & Switch", icon: "🔀", color: "amber", blocks: [
+        { t: "table", h: ["Instruction", "Condition", "Flags"], r: [
+          ["JE / JZ", "Equal / Zero", "ZF=1"],
+          ["JNE / JNZ", "Not equal", "ZF=0"],
+          ["JL / JNGE", "Less (signed)", "SF≠OF"],
+          ["JLE / JNG", "Less or equal (signed)", "ZF=1 or SF≠OF"],
+          ["JG / JNLE", "Greater (signed)", "ZF=0 and SF=OF"],
+          ["JGE / JNL", "Greater or equal (signed)", "SF=OF"],
+          ["JB / JNAE", "Below (unsigned)", "CF=1"],
+          ["JA / JNBE", "Above (unsigned)", "CF=0 and ZF=0"],
+        ]},
+        { t: "code", label: "FOR loop pattern:", c:
+`; for (int i = 0; i < n; i++) { body }
+    xor  ecx, ecx        ; i = 0
+.loop:
+    cmp  ecx, edi        ; i < n? (n in EDI)
+    jge  .done
+    ; body here
+    inc  ecx             ; i++
+    jmp  .loop
+.done:` },
+        { t: "code", label: "Switch-case as jump table:", c:
+`; switch(i) with cases 0,1,2,3
+    cmp  rdi, 3
+    ja   .default           ; out of range → default
+    lea  rax, [rel .table]
+    jmp  [rax + rdi*8]      ; indirect jump through table
+.table:
+    dq  .case0, .case1, .case2, .case3` },
+        { t: "warn", items: [
+          "LEA does NOT access memory — it only computes. MOV [expr] DOES access memory.",
+          "JL is SIGNED (checks SF≠OF). JB is UNSIGNED (checks CF). Wrong choice = wrong branch.",
+          "LOOP instruction decrements RCX then jumps if RCX≠0. If RCX=0 before LOOP, it becomes 2⁶⁴-1.",
+          "Jump table only works for dense cases. Sparse cases compile to chains of CMP+JE.",
+        ]},
       ]},
     ],
   },
+
+  // ─────────────────────────────────────────────────────────── TOPIC 7
   {
     number: 7, short: "Stack & Procedures",
     title: "Topic 7 – Stack, Calling Conventions, Stack Frames & Recursion",
-    overview: "Stack grows downward. CALL pushes return address; RET pops it. System V AMD64 ABI: args in RDI RSI RDX RCX R8 R9, return in RAX. RSP must be 16-byte aligned before CALL.",
+    overview: "The stack grows downward. CALL pushes the return address; RET pops it. System V AMD64 ABI: first 6 integer args go in registers (RDI RSI RDX RCX R8 R9), return value in RAX. Each function creates a stack frame.",
     sections: [
-      { heading: "Stack Mechanics", color: "indigo", icon: "📚", items: [
-        "Stack grows HIGH→LOW. RSP = lowest used address (top of stack).",
-        "PUSH src: RSP -= 8; [RSP] = src",
-        "POP dst: dst = [RSP]; RSP += 8",
-        "CALL label: PUSH RIP (next instr addr); JMP label",
-        "RET: POP RIP; JMP RIP",
-        "LEAVE = MOV RSP,RBP; POP RBP. Replaces manual epilogue.",
-        "Stack overflow: RSP below guard page → SIGSEGV. Default stack ~8 MB Linux.",
+      { heading: "Stack Mechanics", icon: "📚", color: "indigo", blocks: [
+        { t: "dia", label: "Stack grows toward lower addresses:", c:
+`High addresses
+┌───────────────────────┐
+│    argument 7+        │ [RBP + 16 + 8*(n-7)]
+├───────────────────────┤
+│    return address     │ [RBP + 8]   ← pushed by CALL
+├───────────────────────┤ ← RBP points here after prologue
+│    saved old RBP      │ [RBP + 0]
+├───────────────────────┤
+│    local variable 1   │ [RBP - 8]
+├───────────────────────┤
+│    local variable 2   │ [RBP - 16]
+├───────────────────────┤
+│     (red zone)        │  128 bytes, leaf functions only
+└───────────────────────┘ ← RSP points here
+Low addresses` },
+        { t: "table", h: ["Instruction", "Effect"], r: [
+          ["PUSH src", "RSP -= 8; [RSP] = src"],
+          ["POP dst", "dst = [RSP]; RSP += 8"],
+          ["CALL label", "PUSH RIP; JMP label"],
+          ["RET", "POP RIP; JMP RIP"],
+          ["LEAVE", "MOV RSP,RBP; POP RBP  (shorthand for epilogue)"],
+        ]},
       ]},
-      { heading: "System V AMD64 Calling Convention", color: "violet", icon: "📞", items: [
-        "Integer/pointer args 1–6: RDI RSI RDX RCX R8 R9 (memorize this order).",
-        "Float args 1–8: XMM0–XMM7.",
-        "More than 6 integer args: extras pushed on stack right-to-left.",
-        "Return value: integer/pointer → RAX. 128-bit → RDX:RAX. Float → XMM0.",
-        "Caller-saved (callee may clobber): RAX RCX RDX RSI RDI R8–R11.",
-        "Callee-saved (must preserve): RBX RBP R12–R15.",
-        "RSP must be 16-byte aligned BEFORE the CALL. After CALL, RSP is 8-byte (misaligned by CALL push).",
-        "Red zone: 128 bytes below RSP usable by leaf functions without adjusting RSP.",
+      { heading: "System V AMD64 Calling Convention", icon: "📞", color: "violet", blocks: [
+        { t: "dia", label: "Argument passing and register preservation:", c:
+`Integer/pointer arguments (in order):
+  1st: RDI   2nd: RSI   3rd: RDX
+  4th: RCX   5th: R8    6th: R9
+  7th+: pushed on stack right-to-left
+
+Return value:  RAX (integer/pointer)
+               RDX:RAX (128-bit)
+               XMM0 (float/double)
+
+Caller-saved (callee may clobber freely):
+  RAX  RCX  RDX  RSI  RDI  R8  R9  R10  R11
+
+Callee-saved (callee MUST restore before RET):
+  RBX  RBP  R12  R13  R14  R15` },
+        { t: "code", label: "Standard function prologue/epilogue:", c:
+`my_func:
+    push rbp           ; save caller's RBP (callee-saved)
+    mov  rbp, rsp      ; set frame base
+    sub  rsp, 32       ; allocate 32 bytes for locals (must keep RSP 16-aligned!)
+    ; args in RDI, RSI, RDX, RCX, R8, R9
+    ; locals at [rbp-8], [rbp-16], etc.
+    mov  rax, [rbp-8]  ; read local var
+    leave              ; MOV RSP,RBP; POP RBP
+    ret` },
+        { t: "p", c: "Red zone: the 128 bytes below RSP are guaranteed not to be clobbered by signal handlers or interrupts. Leaf functions (those that call no other functions) can use this space for locals without adjusting RSP." },
       ]},
-      { heading: "Stack Frame & Recursion", color: "amber", icon: "🔁", items: [
-        "Prologue: PUSH RBP; MOV RBP,RSP; SUB RSP,N (reserve N bytes for locals).",
-        "Epilogue: MOV RSP,RBP; POP RBP; RET (or LEAVE; RET).",
-        "Frame layout from RBP upward: [RBP+16]=7th arg, [RBP+8]=return addr, [RBP+0]=saved RBP.",
-        "Locals below RBP: [RBP-8]=local1, [RBP-16]=local2, ...",
-        "Recursion: each call creates new stack frame. No shared locals between calls.",
-        "Tail call: last action is a CALL → compiler can JMP (no new frame).",
-        "Example factorial: if n<=1 ret 1; else: SUB RSP,8; save rdi; CALL fact(n-1); MUL saved_n; ret.",
-      ]},
-      { heading: "Exam Traps", color: "red", icon: "⚠️", items: [
-        "After CALL, RSP is misaligned by 8. PUSH RBP in prologue realigns to 16.",
-        "Callee must save RBX R12–R15 if used. Failing to restore = caller gets corrupted value.",
-        "[RBP+8] = return address. [RBP+16] = 7th arg. [RBP-8] = first local.",
-        "1st arg is RDI, NOT RAX. Return goes INTO RAX.",
-        "Red zone: only for LEAF functions (no further CALL). Signal delivery can overwrite it.",
+      { heading: "Recursion & Stack Frames", icon: "🔁", color: "amber", blocks: [
+        { t: "p", c: "Recursive functions work identically to non-recursive ones — each call gets its own stack frame with its own copy of local variables. The call chain unwinds as each RET pops back to the caller." },
+        { t: "code", label: "Recursive factorial in NASM:", c:
+`; int64 factorial(int64 n) — n in RDI, result in RAX
+factorial:
+    push rbp
+    mov  rbp, rsp
+    sub  rsp, 16
+
+    cmp  rdi, 1
+    jle  .base           ; if n <= 1, return 1
+
+    mov  [rbp-8], rdi    ; save n (RDI is caller-saved!)
+    dec  rdi
+    call factorial       ; recursive call: factorial(n-1) → RAX
+    imul rax, [rbp-8]   ; result * n
+
+    leave
+    ret
+
+.base:
+    mov  rax, 1
+    leave
+    ret` },
+        { t: "warn", items: [
+          "After CALL, RSP misaligned by 8. PUSH RBP in prologue re-aligns to 16.",
+          "Callee must save/restore RBX R12–R15. Failing to restore = caller gets corrupted value.",
+          "[RBP+8] = return address. [RBP+16] = 7th arg (if any). [RBP-8] = first local.",
+          "1st arg arrives in RDI, NOT RAX. Return value goes into RAX.",
+          "Red zone: only for LEAF functions. Signal delivery can overwrite it in non-leaf.",
+        ]},
       ]},
     ],
   },
+
+  // ─────────────────────────────────────────────────────────── TOPIC 8
   {
     number: 8, short: "NASM Macros",
     title: "Topic 8 – NASM Preprocessor, Single-line & Multi-line Macros",
-    overview: "NASM preprocessor runs before assembly. %define = text substitution. %macro/%endmacro = parameterized multi-line macros. Local labels (%%label) avoid duplicate definitions across expansions.",
+    overview: "The NASM preprocessor runs a full text-substitution pass before assembly. %define replaces text at use time. %macro/%endmacro creates parameterized multi-line macros. Local labels (%%label) prevent duplicate symbol errors.",
     sections: [
-      { heading: "%define & %assign", color: "indigo", icon: "📌", items: [
-        "%define NAME value — text substitution. NAME replaced everywhere in source at use time.",
-        "%define SQUARE(x) ((x)*(x)) — function-like, parameter in parens.",
-        "%assign NAME expr — evaluates expression at define time to a number.",
-        "%undef NAME — remove definition.",
-        "%xdefine — expands parameters at define time (eager), not at use time (lazy like %define).",
-        "Predefined macros: __NASM_MAJOR__, __BITS__, __FILE__, __LINE__.",
+      { heading: "%define & %assign", icon: "📌", color: "indigo", blocks: [
+        { t: "code", c:
+`; %define: text substitution (lazy — evaluated at use site)
+%define WIDTH  80
+%define SQUARE(x)  ((x)*(x))
+
+    mov  rax, WIDTH         ; → mov rax, 80
+    mov  rbx, SQUARE(5)     ; → mov rbx, ((5)*(5))
+
+; %assign: numeric constant (eager — evaluated at definition)
+%assign BUFSIZE  1024
+%assign BUFSIZE  BUFSIZE * 2   ; now 2048  (ok with %assign, not %define)
+
+; %undef: remove macro
+%undef WIDTH
+
+; %xdefine: expand args at definition time (prevents re-expansion)
+%define A  5
+%xdefine B  A    ; B = 5 immediately
+%define  A  10
+; B is still 5, A is now 10` },
       ]},
-      { heading: "%macro / %endmacro", color: "violet", icon: "📦", items: [
-        "%macro name nparams ... %endmacro — define multi-line macro.",
-        "Parameters: %1, %2, ... %9. For 10+: %{10}.",
-        "Variable args: %macro name 1-* (at least 1). %0 = actual arg count.",
-        "%%label — local label unique per expansion. Prevents 'duplicate label' error.",
-        "Example: %macro SWAP 2 / push %1 / push %2 / pop %1 / pop %2 / %endmacro",
-        "Macros can call other macros and use directives inside.",
+      { heading: "%macro / %endmacro", icon: "📦", color: "violet", blocks: [
+        { t: "code", c:
+`; Syntax: %macro name nparams
+;   %1, %2, ... = parameters
+;   %%label     = local label (unique per expansion)
+
+%macro PUSHREGS 0
+    push rbx
+    push r12
+    push r13
+%endmacro
+
+%macro POPREGS 0
+    pop  r13
+    pop  r12
+    pop  rbx
+%endmacro
+
+; Parameterized with local label:
+%macro REPEAT 2        ; %1 = register, %2 = count
+    mov  rcx, %2
+%%top:
+    ; loop body uses %1
+    dec  rcx
+    jnz  %%top         ; %%top unique per expansion!
+%endmacro
+
+; Variable args: %macro name 1-*
+;   %0 = count of actual args
+;   %{1:3} = first 3 args` },
       ]},
-      { heading: "Conditionals & %include", color: "amber", icon: "🔀", items: [
-        "%include 'file.asm' — textually inserts file content at that point.",
-        "%ifdef NAME / %else / %endif — conditional assembly if NAME defined.",
-        "%ifndef NAME / %endif — if NOT defined. Use for include guards.",
-        "%if expr / %elif / %else / %endif — numeric condition.",
-        "%rep N / ... / %endrep — repeat block N times (compile-time, not runtime).",
-        "Include guard: %ifndef _MYFILE_INC / %define _MYFILE_INC / code / %endif",
-      ]},
-      { heading: "Exam Traps", color: "red", icon: "⚠️", items: [
-        "%define is TEXT substitution — no evaluation. %assign evaluates. Confusing them = bug.",
-        "%%label needed inside macros. Multiple expansions without %% → duplicate label error.",
-        "Macro does NOT save registers automatically. Modified caller-saved regs are gone.",
-        "%0 = number of args actually passed (variadic macros).",
-        "%rep duplicates code N times (code size grows). NOT a runtime loop.",
-        "NASM macro names are case-sensitive.",
+      { heading: "Conditionals & %include", icon: "🔀", color: "amber", blocks: [
+        { t: "code", c:
+`; Include guard pattern:
+%ifndef _MYLIB_INC
+%define _MYLIB_INC
+
+    ; library code here
+
+%endif
+
+; Conditional assembly:
+%ifdef DEBUG
+    ; debug-only code
+%else
+    ; release code
+%endif
+
+; %if with expression:
+%if BITS == 64
+    mov rax, rdi
+%else
+    mov eax, [esp+4]
+%endif
+
+; %rep: repeat block N times (compile-time, NOT a runtime loop)
+%rep 4
+    nop
+%endrep    ; emits 4 NOP instructions` },
+        { t: "warn", items: [
+          "%define is LAZY text substitution — no evaluation. %assign evaluates at definition time.",
+          "Without %%label inside a macro, multiple expansions create duplicate label error.",
+          "Macros save NO registers automatically. Modifying caller-saved regs inside = caller's values gone.",
+          "%rep duplicates code — code size grows ×N. NOT a runtime loop.",
+          "NASM macro names are case-sensitive. %macro Foo and %macro foo are different.",
+        ]},
       ]},
     ],
   },
+
+  // ─────────────────────────────────────────────────────────── TOPIC 9
   {
     number: 9, short: "STRUC & Alignment",
     title: "Topic 9 – STRUC, ISTRUC & Alignment Principles",
-    overview: "STRUC defines struct layout (no allocation). ISTRUC allocates and initializes. Alignment: field of size N must be at address divisible by N. Padding is added automatically by compilers.",
+    overview: "STRUC defines a struct memory layout (a template — no bytes allocated). ISTRUC allocates and initializes an instance. Alignment means each field must start at an address divisible by its own size. Compilers/assemblers add padding to enforce this.",
     sections: [
-      { heading: "STRUC & ISTRUC", color: "indigo", icon: "🗂️", items: [
-        "STRUC name / .field resX count / ENDSTRUC — template only, no memory allocated.",
-        "Access fields by: name.field (gives byte offset). sizeof: name_size.",
-        "ISTRUC name / AT name.field, dX value / IEND — allocates+initializes struct.",
-        "AT sets specific field. Unset fields initialized to 0.",
-        "Example: STRUC Point / .x resd 1 / .y resd 1 / ENDSTRUC → Point.x=0, Point.y=4, Point_size=8",
-        "Arrays of structs: label ISTRUC Point / ... / IEND times N (N instances).",
+      { heading: "STRUC & ISTRUC", icon: "🗂️", color: "indigo", blocks: [
+        { t: "code", c:
+`; Define struct layout (no memory allocated)
+STRUC Person
+    .age    resb 1     ; byte  at offset 0
+    .pad    resb 3     ; manual padding to align .score
+    .score  resd 1     ; dword at offset 4
+    .name   resb 16    ; 16 bytes at offset 8
+ENDSTRUC
+; NASM auto-creates: Person_size = 24
+
+; Instantiate (allocates memory):
+john: ISTRUC Person
+    AT Person.age,   db 21
+    AT Person.score, dd 95
+    AT Person.name,  db "John", 0
+IEND
+
+; Access fields:
+mov al, [john + Person.age]     ; load age
+mov eax, [john + Person.score]  ; load score` },
       ]},
-      { heading: "Alignment Rules", color: "violet", icon: "📐", items: [
-        "Natural alignment: field of size N bytes → address must be multiple of N.",
-        "char(1B): any addr. short(2B): even. int(4B): mult of 4. int64(8B): mult of 8.",
-        "SIMD (XMM=128b, YMM=256b): 16 or 32-byte aligned.",
-        "ALIGN N — insert NOP bytes (code) until current address is multiple of N.",
-        "ALIGNB N — insert 0x00 bytes (data sections).",
-        "Stack: RSP must be 16-byte aligned before CALL (System V ABI).",
-        "Misaligned access: performance penalty (cache line split). Some CPUs (ARM) fault.",
-      ]},
-      { heading: "Struct Padding", color: "amber", icon: "📏", items: [
-        "Compiler adds padding between fields to satisfy alignment.",
-        "struct{char a; int b;} → a@0, 3B pad, b@4. sizeof=8 (not 5).",
-        "struct{int a; char b;} → a@0, b@4, 3B end pad. sizeof=8.",
-        "Struct itself aligns to its largest member. Trailing padding added too.",
-        "Optimization: order fields largest-first → minimal padding.",
-        "Example: {int(4), short(2), char(1), char(1)} = 8B. vs {char,int,short} = 12B.",
-        "__attribute__((packed)) removes padding — risks misaligned access.",
-      ]},
-      { heading: "Exam Traps", color: "red", icon: "⚠️", items: [
-        "sizeof(struct) ≠ sum of field sizes. Padding makes it larger.",
-        "STRUC allocates NO memory. ISTRUC does.",
-        "Trailing padding: struct{int,char} has 3 bytes padding at end. sizeof=8 not 5.",
-        "ALIGN N: N must be power of 2.",
-        "AT in ISTRUC takes offset constant (Point.x=0), not the field name or value.",
+      { heading: "Alignment Rules & Padding", icon: "📐", color: "violet", blocks: [
+        { t: "p", c: "Natural alignment: a field of size N bytes must sit at an address that is a multiple of N. The CPU may perform multiple memory bus cycles for misaligned access (performance penalty), and some CPUs (ARM) fault entirely." },
+        { t: "dia", label: "Padding example — struct { char a; int b; char c; }:", c:
+`Byte offset: 0    1    2    3    4    5    6    7    8    9   10   11
+             ┌────┬────┬────┬────┬────┴────┴────┘┌────┬────┬────┬────┐
+             │ a  │ P  │ P  │ P  │       b (int) ││ c  │ P  │ P  │ P  │
+             └────┴────┴────┴────┴───────────────┘└────┴────┴────┴────┘
+             P = padding byte                     sizeof = 12, not 6!` },
+        { t: "table", h: ["Type", "Alignment requirement", "Notes"], r: [
+          ["char (1B)", "any address", ""],
+          ["short (2B)", "multiple of 2", "even address"],
+          ["int (4B)", "multiple of 4", ""],
+          ["int64 (8B)", "multiple of 8", ""],
+          ["XMM (16B)", "multiple of 16", "SSE instructions"],
+          ["YMM (32B)", "multiple of 32", "AVX instructions"],
+          ["struct", "largest member's alignment", "plus trailing padding"],
+        ]},
+        { t: "code", label: "Minimize padding — order fields largest-first:", c:
+`// BAD:  char(1) + int(4) + char(1) = 12 bytes (4 bytes wasted)
+struct { char a; int b; char c; };
+
+// GOOD: int(4) + char(1) + char(1) = 8 bytes (2 bytes waste at end only)
+struct { int b; char a; char c; };
+
+// In NASM:
+ALIGN 4    ; pad to 4-byte boundary before int field
+ALIGNB 16  ; for data sections (uses 0x00, not NOP)` },
+        { t: "warn", items: [
+          "sizeof(struct) ≠ sum of field sizes. Padding bytes inflate it.",
+          "Struct has trailing padding so that arrays of structs maintain alignment.",
+          "STRUC allocates NO memory. ISTRUC does.",
+          "ALIGN N in NASM: N must be a power of 2.",
+        ]},
       ]},
     ],
   },
+
+  // ─────────────────────────────────────────────────────────── TOPIC 10
   {
     number: 10, short: "Data Types & Arrays",
-    title: "Topic 10 – Basic Data Types & Array Organization (1D, 2D, 3D)",
-    overview: "NASM data directives: db(1B), dw(2B), dd(4B), dq(8B). Arrays are contiguous. 1D: base+i×E. 2D row-major (C): base+(r×COLS+c)×E. 3D: base+(d×R×C+r×C+c)×E.",
+    title: "Topic 10 – Data Types, 1D/2D/3D Arrays in NASM",
+    overview: "NASM defines data with db/dw/dd/dq. Arrays are contiguous in memory. Element access = base + index × element_size. C stores 2D arrays in row-major order: all of row 0, then row 1, etc.",
     sections: [
-      { heading: "Basic Data Types", color: "indigo", icon: "📋", items: [
-        "Initialized: db(1B) dw(2B) dd(4B) dq(8B) dt(10B).",
-        "Uninitialized (BSS): resb N, resw N, resd N, resq N — reserves N units.",
-        "Multiple values: arr dd 1,2,3,4 — 4 consecutive DWORDs (16 bytes total).",
-        "String: msg db 'Hello',10,0 — with newline and null terminator.",
-        "Repeat: arr times 10 dd 0 — ten 4-byte zeros.",
-        "EQU: LEN EQU $-msg — constant, not in memory, cannot take address.",
-        "$ = current address. $$ = start of current section.",
+      { heading: "NASM Data Directives", icon: "📋", color: "indigo", blocks: [
+        { t: "table", h: ["Directive", "Size", "Example", "Notes"], r: [
+          ["db", "1 byte", "db 0x41, 'A', 65", "All equivalent"],
+          ["dw", "2 bytes", "dw 1000", "word"],
+          ["dd", "4 bytes", "dd 3.14", "float literal OK"],
+          ["dq", "8 bytes", "dq 0xDEADBEEF", "qword"],
+          ["dt", "10 bytes", "dt 3.14159", "80-bit extended float"],
+          ["resb N", "N bytes", "buf resb 256", "uninit, BSS"],
+          ["resd N", "N×4 bytes", "arr resd 100", "100 ints, uninit"],
+          ["times N dx val", "N copies", "times 8 db 0", "8 zero bytes"],
+        ]},
+        { t: "code", c:
+`section .data
+    arr    dd 10, 20, 30, 40   ; 4 ints = 16 bytes
+    msg    db "Hello", 10, 0   ; string with newline + null
+    pi     dq 3.141592653589793
+    LEN    equ $ - msg         ; compile-time constant, NOT a label
+
+section .bss
+    buffer resb 1024           ; 1024 uninitialized bytes` },
       ]},
-      { heading: "1D Arrays", color: "violet", icon: "📊", items: [
-        "Element size E bytes. Address of element i: base + i × E.",
-        "int array[100]: arr resd 100. arr[i] at arr + i×4.",
-        "NASM: MOV eax,[arr + rcx*4] — loads arr[rcx] (4-byte element).",
-        "Pointer arithmetic: p++ moves by sizeof(*p) bytes in C.",
-        "Valid indices: 0 to N-1. arr[N] is one past end (out of bounds).",
-        "Stack array: SUB RSP,N×4; then [RSP+i×4].",
-      ]},
-      { heading: "2D & 3D Arrays", color: "amber", icon: "🗃️", items: [
-        "C 2D arrays: ROW-MAJOR. int a[R][C]: a[r][c] at offset (r×C + c) × sizeof(int).",
-        "Address: base + (r×C + c) × 4",
-        "NASM: MOV eax,[arr + (r*COLS + c)*4]",
-        "3D int a[D][R][C]: a[d][r][c] at (d×R×C + r×C + c) × sizeof(int).",
-        "Nested array (array of pointers): a[i] is a pointer → dereference twice.",
-        "Fortran/MATLAB: column-major. a[r][c] at (c×R + r) × E.",
-      ]},
-      { heading: "Exam Traps", color: "red", icon: "⚠️", items: [
-        "resb 100 = 100 bytes. resd 100 = 400 bytes (100 × 4B each).",
-        "2D array offset: (r×COLS + c) — uses COLS (width), NOT ROWS.",
-        "Row-major: traversing column-first (a[0][0],a[1][0],...) = cache-unfriendly (stride=COLS).",
-        "times 10 dd 0 = static init, NOT a runtime loop.",
-        "db 'A' = 65. 'A'+1='B' (65+1=66). 'Z'+1=91 ≠ 'a'(97).",
-        "EQU constant: cannot be modified, cannot take address, does not appear in output.",
+      { heading: "1D & 2D Array Access", icon: "📊", color: "violet", blocks: [
+        { t: "dia", label: "Array element address formula:", c:
+`1D: addr(arr[i])    = base + i × sizeof(element)
+2D: addr(a[r][c])   = base + (r × COLS + c) × sizeof(element)
+3D: addr(a[d][r][c])= base + (d × ROWS × COLS + r × COLS + c) × sizeof(element)
+
+Example — int a[3][4], element a[1][2]:
+  offset = (1 × 4 + 2) × 4 = 6 × 4 = 24 bytes from base` },
+        { t: "dia", label: "int a[3][4] in memory (row-major, C order):", c:
+`         col0     col1     col2     col3
+row 0: [a[0][0]][a[0][1]][a[0][2]][a[0][3]]
+row 1: [a[1][0]][a[1][1]][a[1][2]][a[1][3]]
+row 2: [a[2][0]][a[2][1]][a[2][2]][a[2][3]]
+
+Contiguous in memory: a[0][0] a[0][1] a[0][2] a[0][3] a[1][0] ...` },
+        { t: "code", label: "NASM — access a[rcx][rdx] (int array, COLS=4):", c:
+`; a[rcx][rdx] where COLS=4, element=int(4B)
+; offset = (rcx * 4 + rdx) * 4
+lea  rax, [rcx*4 + rdx]    ; rax = rcx*4 + rdx (index)
+mov  eax, [arr + rax*4]    ; load element (scale=4 for int)` },
+        { t: "warn", items: [
+          "resd N reserves N × 4 bytes (N dwords). resb N reserves N bytes. Easy to confuse.",
+          "2D offset uses COLS (width), NOT ROWS. Formula: (r×COLS + c) × elem_size.",
+          "Row-major: traversing by column-first (a[0][0], a[1][0], ...) = stride=COLS → cache-unfriendly.",
+          "EQU creates a compile-time constant — NOT a label. Cannot take its address.",
+          "times 10 dd 0 is static initialization. Does NOT create a runtime loop.",
+        ]},
       ]},
     ],
   },
+
+  // ─────────────────────────────────────────────────────────── TOPIC 11
   {
     number: 11, short: "Memory Layout",
-    title: "Topic 11 – Memory Layout & Memory Read/Write Transactions",
-    overview: "Process virtual address space: text | data | BSS | heap↑ ↓stack. Read transactions check cache hierarchy then DRAM. Write policies: write-through vs write-back.",
+    title: "Topic 11 – Memory Layout for Running Application & Memory Transactions",
+    overview: "A process's virtual address space is divided into fixed segments. Code, data, BSS, heap (grows up), and stack (grows down). Memory transactions go through the cache hierarchy before hitting DRAM. Write-back vs write-through determines when DRAM gets updated.",
     sections: [
-      { heading: "Virtual Address Space Segments", color: "indigo", icon: "🗺️", items: [
-        "Low → High on Linux x86-64: [null] text data BSS heap↑ ... ↓stack [kernel]",
-        "Text (.text): machine code. Read-only + executable. Starts ~0x400000.",
-        "Data (.data): initialized global and static variables.",
-        "BSS (.bss): uninitialized global/static variables. Zero-initialized by OS. No disk space in ELF.",
-        "Heap: after BSS, grows UPWARD. malloc/free. Extended via brk() or mmap().",
-        "Stack: starts from high address, grows DOWNWARD. Local vars, frames.",
-        "Memory-mapped region (between heap and stack): shared libs, mmap'd files.",
-        "Kernel space: top of address space, inaccessible from ring 3.",
+      { heading: "Virtual Address Space", icon: "🗺️", color: "indigo", blocks: [
+        { t: "dia", label: "Linux x86-64 process address space:", c:
+`0xFFFFFFFFFFFFFFFF ┌──────────────────────────┐
+                   │       Kernel Space        │ inaccessible from user mode
+0x00007FFFFFFFFFFF ├──────────────────────────┤
+                   │   Stack (grows ↓)         │ local vars, frames, saved regs
+                   │          ↓               │
+                   ├──────────────────────────┤
+                   │   Memory-mapped region   │ shared libs (.so), mmap files
+                   ├──────────────────────────┤
+                   │          ↑               │
+                   │   Heap (grows ↑)          │ malloc/free
+                   ├──────────────────────────┤
+                   │   BSS segment             │ uninit globals, zero-inited by OS
+                   ├──────────────────────────┤
+                   │   Data segment            │ initialized global/static vars
+                   ├──────────────────────────┤
+0x0000000000400000 │   Text segment            │ machine code (read-only, exec)
+0x0000000000000000 └──────────────────────────┘` },
+        { t: "table", h: ["Segment", "Content", "Init", "File space"], r: [
+          [".text", "Machine code", "from binary", "yes"],
+          [".data", "Initialized globals/statics", "from binary", "yes"],
+          [".bss", "Uninitialized globals/statics", "OS zeroes it", "NO (just size)"],
+          ["heap", "malloc() allocations", "depends", "no (dynamic)"],
+          ["stack", "Local vars, frames", "depends", "no (dynamic)"],
+        ]},
       ]},
-      { heading: "Memory Read/Write Transactions", color: "violet", icon: "⚡", items: [
-        "Load: L1 miss → L2 miss → L3 miss → DRAM. Each level checked before next.",
-        "Store write-through: write updates cache AND next level simultaneously. Simpler. Higher bandwidth.",
-        "Store write-back: write only updates cache (dirty bit set). Writeback to lower on eviction.",
-        "Write-allocate: on write miss, load line into cache then modify. Pairs with write-back.",
-        "No-write-allocate: on write miss, write directly to next level. Pairs with write-through.",
-        "Cache line = 64 bytes. Entire line fetched on miss (spatial locality).",
-        "False sharing: threads write different vars in same 64B cache line → line ping-pong.",
-      ]},
-      { heading: "Heap & Stack Details", color: "amber", icon: "📦", items: [
-        "malloc(n): allocates at least n bytes on heap. Returns pointer or NULL on failure.",
-        "free(p): returns block to heap free list. Does NOT zero memory or return to OS immediately.",
-        "Fragmentation: many small allocs/frees → unusable gaps in free list.",
-        "Stack frame: created on each CALL, destroyed on RET (RSP restored).",
-        "Stack overflow: RSP below guard page → SIGSEGV. Recursive depth limited.",
-        "VMA: kernel tracks each mapped region with permissions (rwx). /proc/PID/maps shows them.",
-      ]},
-      { heading: "Exam Traps", color: "red", icon: "⚠️", items: [
-        "BSS: no space in executable file. OS zero-inits. Never confuse with .data.",
-        "Stack grows DOWN; heap grows UP. They can collide given enough growth.",
-        "free() does not zero memory — next malloc may return same memory with old values.",
-        "Write-back: DRAM has stale data until dirty line evicted. DMA engines read DRAM directly → flush first.",
-        "Text segment is read-only. Writing to it → SIGSEGV.",
-        "mmap(MAP_ANONYMOUS): allocates pages, zero-initialized. Pages only physically allocated on first access (page fault).",
+      { heading: "Memory Read/Write Transactions", icon: "⚡", color: "violet", blocks: [
+        { t: "dia", label: "Cache hierarchy and write policies:", c:
+`CPU → L1 (32KB, ~4 cycles) → L2 (256KB, ~12 cycles) → L3 (8MB+, ~40 cycles) → DRAM (~100 ns)
+
+Write-through:
+  Every write → update cache AND next level simultaneously
+  Simple, DRAM always up to date, higher bandwidth demand
+
+Write-back:
+  Write → update cache only, set "dirty" bit
+  Dirty line written to next level only on EVICTION
+  Better performance, DRAM may be stale
+
+Write-allocate (with write-back):
+  On write miss: load line into cache first, then modify
+  Assumes more writes to same cache line follow
+
+No-write-allocate (with write-through):
+  On write miss: write directly to next level, skip cache` },
+        { t: "warn", items: [
+          "BSS takes NO space in the ELF file. OS zero-initializes it on load.",
+          "free() does NOT zero memory or return it to OS — just adds to heap free list.",
+          "Write-back: DRAM has stale data. DMA devices read DRAM directly — must cache-flush before DMA.",
+          "Text segment is read-only. Writing to it → SIGSEGV.",
+          "Stack grows DOWN; heap grows UP. Both growing toward each other can collide.",
+          "False sharing: two threads write different vars in same 64-byte cache line → cache bounces.",
+        ]},
       ]},
     ],
   },
+
+  // ─────────────────────────────────────────────────────────── TOPIC 12
   {
     number: 12, short: "Cache",
     title: "Topic 12 – Memory Hierarchy: Cache",
-    overview: "Caches exploit locality. Organized as S sets × E ways × B bytes/line. Address = tag | set_index | block_offset. Miss types: compulsory, capacity, conflict. LRU replacement.",
+    overview: "Caches exploit temporal locality (reuse same data soon) and spatial locality (access nearby data). A cache is organized as S sets × E ways × B bytes per line. On a miss, the full 64-byte cache line is fetched. Replacement policy (LRU) decides which way to evict.",
     sections: [
-      { heading: "Cache Organization", color: "indigo", icon: "⚡", items: [
-        "Cache line = 64 bytes (typical). Unit of transfer between levels.",
-        "Direct-mapped (1-way): one possible set per block. Fast but high conflict miss rate.",
-        "E-way set-associative: S sets, E ways per set. Block maps to one set, any way.",
-        "Fully associative: 1 set, all ways. No conflict misses. Hardware expensive.",
-        "Cache capacity = S × E × B bytes.",
-        "L1 data: ~32 KB, 8-way, 4-cycle. L2: ~256 KB, 8-way, ~12 cycles. L3: 8–32 MB, shared, ~40 cycles.",
+      { heading: "Cache Organization", icon: "⚡", color: "indigo", blocks: [
+        { t: "dia", label: "Cache structure (S sets, E ways, B bytes/line):", c:
+`        Way 0              Way 1           ...     Way E-1
+      ┌───┬──────┬──────┐ ┌───┬──────┬──────┐   ┌───┬──────┬──────┐
+Set 0 │ V │ Tag  │ Data │ │ V │ Tag  │ Data │...│ V │ Tag  │ Data │
+      └───┴──────┴──────┘ └───┴──────┴──────┘   └───┴──────┴──────┘
+Set 1 │ V │ Tag  │ Data │ │ V │ Tag  │ Data │...│ V │ Tag  │ Data │
+  .
+  .
+Set S-1 ...
+
+V = valid bit. Tag = upper bits of address. Data = B bytes.
+Cache size = S × E × B  bytes` },
+        { t: "table", h: ["Type", "Sets", "Ways", "Conflict misses", "Hardware cost"], r: [
+          ["Direct-mapped", "many", "1", "high", "low"],
+          ["E-way set-assoc", "S", "E", "reduced", "medium"],
+          ["Fully associative", "1", "all", "none", "very high"],
+        ]},
       ]},
-      { heading: "Address Decomposition", color: "violet", icon: "🔢", items: [
-        "Address split (low to high): [block offset b bits][set index s bits][tag t bits]",
-        "b = log₂(block_size). For 64B lines: b=6.",
-        "s = log₂(S). For 64 sets: s=6.",
-        "t = address_bits - s - b. Tag stored in cache to verify hit.",
-        "Hit: valid=1 AND tag matches → return data at offset in cache line.",
-        "Miss: valid=0 OR tag mismatch → fetch from next level, install in cache.",
-        "Example: 32KB 8-way 64B lines → S=32768/(8×64)=64 sets. s=6, b=6, t=52 (64-bit addr).",
+      { heading: "Address Decomposition", icon: "🔢", color: "violet", blocks: [
+        { t: "dia", label: "How a 64-bit address maps to cache:", c:
+`Address bits (from low to high):
+┌──────────────────┬──────────────┬──────────────┐
+│   Block Offset   │  Set Index   │     Tag      │
+│     b bits       │   s bits     │  remaining   │
+└──────────────────┴──────────────┴──────────────┘
+
+b = log₂(B)   → which byte within the cache line
+s = log₂(S)   → which set to look in
+tag = rest    → stored in cache to verify it's the right line
+
+Example: 32KB, 8-way, 64B lines
+  B=64  → b=6
+  S = 32768 / (8×64) = 64  → s=6
+  tag = 64 - 6 - 6 = 52 bits` },
+        { t: "dia", label: "Cache lookup process:", c:
+`1. Extract set index s bits → go to that set
+2. Compare tag against all E ways simultaneously
+3. If valid=1 AND tag matches → HIT → return byte at offset
+4. If no match → MISS → fetch 64-byte line from next level
+5. On miss: if set full → evict one way (LRU), install new line` },
       ]},
-      { heading: "Replacement, Policies & Locality", color: "amber", icon: "🔄", items: [
-        "On miss with full set: evict one way. Policies: LRU, pseudo-LRU, random.",
-        "Compulsory (cold) miss: first ever access to a block. Unavoidable.",
-        "Capacity miss: working set > cache size. Would miss even with full associativity.",
-        "Conflict miss: multiple blocks compete for same set. Solved by higher associativity.",
-        "Write-back + write-allocate: typical L1/L2. Dirty bit per line.",
-        "Temporal locality: reuse same address soon → stays in cache.",
-        "Spatial locality: access nearby addresses → loaded together in cache line.",
-        "Prefetching: hardware detects stride, preloads next lines automatically.",
-      ]},
-      { heading: "Exam Traps", color: "red", icon: "⚠️", items: [
-        "Set index bits come from MIDDLE of address (not MSBs or LSBs).",
-        "Stride = cache_size/associativity → always maps to same set → thrashing.",
-        "Higher associativity helps conflict misses. Does NOT help capacity misses.",
-        "Write-back: dirty cache line NOT in DRAM yet. DRAM has stale data.",
-        "TLB miss ≠ cache miss. TLB miss walks page table; cache miss fetches data block.",
-        "Increasing block size: better spatial locality but more bandwidth per miss.",
+      { heading: "Miss Types & Optimization", icon: "🔄", color: "amber", blocks: [
+        { t: "table", h: ["Miss type", "Cause", "Fix"], r: [
+          ["Compulsory (cold)", "First access ever", "Prefetching"],
+          ["Capacity", "Working set > cache", "Reduce data set size"],
+          ["Conflict", "Many blocks map to same set", "Higher associativity, pad arrays"],
+        ]},
+        { t: "p", c: "Cache performance is dominated by access patterns. Sequential (stride-1) access is ideal — each cache miss loads 64 bytes, and subsequent 15 accesses hit. Stride=cache_size/associativity access thrashes the cache (all accesses map to the same set)." },
+        { t: "code", label: "Cache-friendly vs unfriendly 2D array traversal:", c:
+`// GOOD: row-major (sequential in memory, stride-1)
+for (int r = 0; r < R; r++)
+  for (int c = 0; c < C; c++)
+    sum += a[r][c];    // a[r][0..C-1] all in nearby cache lines
+
+// BAD: column-major (stride=C, each access a cache miss)
+for (int c = 0; c < C; c++)
+  for (int r = 0; r < R; r++)
+    sum += a[r][c];    // a[0][c], a[1][c]... = stride C apart` },
+        { t: "warn", items: [
+          "Set index bits come from the MIDDLE of the address, not MSBs or LSBs.",
+          "Stride = S×B (cache_size / associativity) → thrashing: all accesses map to same set.",
+          "Write-back: dirty cache line means DRAM has stale data until eviction.",
+          "Larger block size: better spatial locality but higher miss penalty and bandwidth.",
+        ]},
       ]},
     ],
   },
+
+  // ─────────────────────────────────────────────────────────── TOPIC 13
   {
     number: 13, short: "DRAM",
     title: "Topic 13 – Memory Hierarchy: DRAM",
-    overview: "DRAM cells = capacitor + transistor. Must refresh every ~64ms. Access: RAS (open row) → CAS (select column). Row buffer hit is fast. DDR transfers on both clock edges.",
+    overview: "DRAM stores bits as charge in capacitors. Charge leaks — DRAM must be refreshed every ~64ms. Organized in banks of rows and columns. Opening a row loads it into a sense-amplifier row buffer. DDR doubles bandwidth by transferring on both clock edges.",
     sections: [
-      { heading: "DRAM Cell & Organization", color: "indigo", icon: "🔋", items: [
-        "DRAM cell: 1 capacitor + 1 transistor. Charge=1, no charge=0. Leaks → must refresh.",
-        "Refresh interval: ~64 ms. Refresh pauses normal access briefly.",
-        "SRAM (used in caches): 6-transistor flip-flop. No refresh. Faster, larger, more expensive per bit.",
-        "Organization: banks (parallel access) → rows → columns.",
-        "Row buffer (sense amplifiers): entire row (~8 KB) loaded when row opened.",
-        "Row buffer hit: next access to same row = fast (no new RAS needed).",
-        "Row buffer miss: must precharge (close), activate new row (RAS), then CAS.",
+      { heading: "DRAM Cell & Organization", icon: "🔋", color: "indigo", blocks: [
+        { t: "dia", label: "DRAM vs SRAM comparison:", c:
+`                    DRAM                    SRAM
+Cell:               capacitor + transistor   6-transistor flip-flop
+Bits per cell:      1 (traditional)          1
+Refresh needed:     YES (~64ms)              NO
+Density:            high                     low (6× larger per bit)
+Speed:              slower (~ns)             faster (~sub-ns)
+Cost:               cheap                    expensive
+Used for:           main memory              caches (L1/L2/L3)` },
+        { t: "p", c: "DRAM is organized in banks. Each bank has a grid of rows and columns. When a row is accessed, the entire row (~8KB) is loaded into sense amplifiers called the row buffer. Subsequent accesses to the same row can skip the RAS step (row buffer hit) — much faster." },
       ]},
-      { heading: "DRAM Access Timing", color: "violet", icon: "⏱️", items: [
-        "RAS (Row Address Strobe): selects row, opens it into row buffer. Latency = tRCD.",
-        "CAS (Column Address Strobe): selects column from open row. Latency = tCL.",
-        "Precharge: closes row buffer, prepares bank for next RAS. Latency = tRP.",
-        "Total first-access latency: tRCD + tCL ≈ 20–40 ns for DDR4.",
-        "DRAM timing notation: 16-18-18-38 = CL-tRCD-tRP-tRAS (in clock cycles).",
-        "Burst mode: after first CAS, subsequent columns return with no extra latency.",
-        "Bank interleaving: access different banks while one precharges. Hides latency.",
+      { heading: "DRAM Access Timing", icon: "⏱️", color: "violet", blocks: [
+        { t: "dia", label: "DRAM access sequence:", c:
+`CPU request
+    │
+    ▼
+[Send Row Address (RAS)] ──→ wait tRCD (row-to-column delay)
+    │
+    ▼
+[Row opens → entire row in row buffer]
+    │
+    ▼
+[Send Column Address (CAS)] ──→ wait tCL (CAS latency)
+    │
+    ▼
+[Data returned to CPU] ──→ burst: subsequent columns come quickly
+    │
+    ▼
+[Precharge (close row)] ──→ wait tRP → ready for next row
+
+Timing example DDR4-3200 CL16: tCL=16, tRCD=16, tRP=16 (in nanoseconds)` },
+        { t: "table", h: ["Timing param", "Meaning", "Typical DDR4"], r: [
+          ["tRCD", "RAS-to-CAS delay (open row)", "~10–16 ns"],
+          ["tCL", "CAS latency (column access)", "~10–16 ns"],
+          ["tRP", "Row precharge time", "~10–16 ns"],
+          ["tRAS", "Row active time (min)", "~35–45 ns"],
+        ]},
       ]},
-      { heading: "DDR & Bandwidth", color: "amber", icon: "📡", items: [
-        "SDR SDRAM: 1 transfer per clock cycle.",
-        "DDR: transfers on BOTH rising AND falling edges → 2× bandwidth vs SDR.",
-        "DDR4-3200: 3200 MT/s (megatransfers/sec). 64-bit bus → 3200×8 = 25.6 GB/s peak.",
-        "DDR5: higher speeds (4800+), on-die ECC, two 32-bit sub-channels per DIMM.",
-        "Actual clock for DDR4-3200 = 1600 MHz (3200 MT/s ÷ 2).",
-        "HBM: 3D stacked DRAM on package, massive bandwidth (~1 TB/s). Used in GPUs.",
-      ]},
-      { heading: "Exam Traps", color: "red", icon: "⚠️", items: [
-        "DRAM requires periodic refresh. SRAM does not. Refresh causes brief unavailability.",
-        "Row buffer hit is faster than miss — accessing same row multiple times is optimal.",
-        "DDR4-3200: 3200 MT/s is NOT the clock frequency. Actual = 1600 MHz.",
-        "DRAM is VOLATILE — data lost when power removed. Flash/SSD is non-volatile.",
-        "tCL = CAS latency, column-to-data time. Lower tCL = lower latency.",
-        "More DRAM ranks → more capacity but adds rank switching latency.",
+      { heading: "DDR & Bandwidth", icon: "📡", color: "amber", blocks: [
+        { t: "p", c: "DDR (Double Data Rate) transfers data on both the rising and falling edge of the clock. So DDR4-3200 has a 1600 MHz actual clock but 3200 MT/s (megatransfers per second). With a 64-bit bus, peak bandwidth = 3200 × 8 bytes = 25.6 GB/s." },
+        { t: "table", h: ["Standard", "Clock", "Data rate", "Peak BW (64-bit)"], r: [
+          ["DDR4-2400", "1200 MHz", "2400 MT/s", "19.2 GB/s"],
+          ["DDR4-3200", "1600 MHz", "3200 MT/s", "25.6 GB/s"],
+          ["DDR5-4800", "2400 MHz", "4800 MT/s", "38.4 GB/s"],
+          ["DDR5-6400", "3200 MHz", "6400 MT/s", "51.2 GB/s"],
+        ]},
+        { t: "warn", items: [
+          "DRAM requires refresh every ~64ms. Refresh temporarily blocks normal access.",
+          "Row buffer HIT is much faster (just CAS latency). Access same row repeatedly = optimal.",
+          "DDR4-3200 clock = 1600 MHz. The '3200' is MT/s (doubled by DDR). Don't confuse.",
+          "DRAM is volatile — all data lost on power loss. Flash (SSD) is non-volatile.",
+          "More DRAM ranks = more capacity but rank switching adds latency.",
+        ]},
       ]},
     ],
   },
+
+  // ─────────────────────────────────────────────────────────── TOPIC 14
   {
     number: 14, short: "HDD & SSD",
     title: "Topic 14 – Memory Hierarchy: HDD and SSD",
-    overview: "HDD: spinning platters, mechanical seek (~10ms latency), high capacity, low cost. SSD: NAND flash, no moving parts, ~0.1ms read latency, limited P/E write cycles, cannot overwrite in-place.",
+    overview: "HDD latency is dominated by mechanical movement: seek (move head to track) + rotational latency (wait for sector). SSD has no moving parts — NAND flash reads are fast but writes require erasing an entire block first.",
     sections: [
-      { heading: "HDD Mechanics", color: "indigo", icon: "💿", items: [
-        "Platters: spinning magnetic disks at 5400–15000 RPM.",
-        "Tracks: concentric circles on platter. Sectors: fixed arcs on track (~512B or 4KB).",
-        "Cylinders: same track across all platters stacked vertically.",
-        "Read/write head: floats nanometers above surface on actuator arm.",
-        "Seek time: move head to correct track. Avg ~3–10 ms.",
-        "Rotational latency: wait for sector. Avg = ½ rotation. 7200 RPM → 60/(2×7200) ≈ 4.2 ms.",
-        "Transfer time: read sector once under head (~0.05 ms for small sector).",
-        "Total: seek + rotational + transfer. Dominated by seek + rotational.",
+      { heading: "HDD Mechanics", icon: "💿", color: "indigo", blocks: [
+        { t: "dia", label: "HDD structure:", c:
+`Actuator arm
+    │
+    └──→ Read/write head (floats nm above platter)
+              │
+              ▼
+    ┌─────────────────────────────────┐
+    │         Platter (spinning)      │
+    │  ┌─────────────────────────┐   │
+    │  │  Track (concentric ring)│   │
+    │  │  ┌──────────────────┐   │   │
+    │  │  │ Sector (~4KB)    │   │   │
+    │  │  └──────────────────┘   │   │
+    │  └─────────────────────────┘   │
+    └─────────────────────────────────┘
+    Cylinder = same track # across all platters` },
+        { t: "p", c: "Access time = seek time + rotational latency + transfer time. Rotational latency averages half a rotation. At 7200 RPM: avg rotational latency = 60/(2×7200) ≈ 4.17 ms. A full rotation = 60/7200 ≈ 8.33 ms." },
+        { t: "table", h: ["Component", "Typical time", "Notes"], r: [
+          ["Seek time", "3–10 ms", "avg ~5ms. Moving head across tracks"],
+          ["Rotational latency", "0–8.3 ms", "avg ~4ms at 7200 RPM"],
+          ["Transfer time", "~0.05 ms", "for 4KB sector at 100MB/s"],
+          ["Total average", "~9 ms", "dominated by seek + rotation"],
+        ]},
       ]},
-      { heading: "SSD Technology", color: "violet", icon: "💾", items: [
-        "NAND Flash: floating-gate transistors hold charge = bits.",
-        "SLC (1 bit/cell): ~100k P/E cycles, fastest, most expensive.",
-        "MLC (2 bits): ~10k P/E cycles. TLC (3 bits): ~3k. QLC (4 bits): ~1k cycles.",
-        "Write restriction: cannot overwrite in-place. Must erase entire block (~256KB) then write pages (~4KB).",
-        "Write amplification: writing 1 page may require read-modify-write of entire block.",
-        "Wear leveling (FTL): distributes writes evenly across all cells to maximize lifespan.",
-        "TRIM: OS informs SSD which LBAs are deleted. SSD erases proactively → faster future writes.",
-        "FTL (Flash Translation Layer): maps logical → physical addresses. Transparent to OS.",
+      { heading: "SSD Technology", icon: "💾", color: "violet", blocks: [
+        { t: "p", c: "NAND flash stores bits in floating-gate transistors. The critical constraint: flash cannot overwrite in place. You must erase an entire erase block (~256KB) before writing new pages (~4KB). This is managed transparently by the Flash Translation Layer (FTL)." },
+        { t: "dia", label: "SSD write process:", c:
+`Write new data to page P:
+  1. If P's block has free pages → write directly (fast)
+  2. If P's block is full:
+     a. Copy all VALID pages in block to a new block
+     b. Erase entire old block (slow, ~1ms)
+     c. Write new data to erased block
+  → Write Amplification: writing 1 page causes entire block rewrite` },
+        { t: "table", h: ["NAND Type", "Bits/cell", "P/E cycles", "Speed", "Use"], r: [
+          ["SLC", "1", "~100,000", "fastest", "Enterprise, cache"],
+          ["MLC", "2", "~10,000", "fast", "Consumer"],
+          ["TLC", "3", "~3,000", "medium", "Budget consumer"],
+          ["QLC", "4", "~1,000", "slowest", "High capacity"],
+        ]},
       ]},
-      { heading: "Performance Comparison", color: "amber", icon: "📊", items: [
-        "HDD sequential: ~100–200 MB/s. SATA SSD: ~500 MB/s. NVMe SSD: 3–7 GB/s.",
-        "HDD random 4K read: ~0.1–1 MB/s (~100 IOPS). SSD: 100,000–1,000,000 IOPS.",
-        "HDD latency: seek(5ms)+rotational(4ms)+transfer(0.05ms) ≈ 9ms.",
-        "SSD SATA read: ~0.1ms. NVMe read: ~0.02ms.",
-        "HDD cost/GB: ~$0.02. SSD: ~$0.08. HDD wins on price per byte.",
-        "NVMe: uses PCIe directly, not SATA controller. Lower protocol overhead.",
-        "HDD fails from shock/vibration. SSD fails from P/E exhaustion.",
-      ]},
-      { heading: "Exam Traps", color: "red", icon: "⚠️", items: [
-        "Rotational latency avg = 1/(2×RPM) × 60s. The ½ factor is critical (average is half rotation).",
-        "SSD cannot overwrite — erase block first. Source of write amplification.",
-        "TRIM: without it, SSD writes slow over time as it must erase before every write.",
-        "NVMe is NOT just a fast SATA. It uses PCIe and a completely different protocol (NVMe spec).",
-        "SSD wear leveling: logical address X may go to different physical cell each time written.",
-        "HDD access time: seek dominates. Transfer time is relatively tiny.",
+      { heading: "Performance Comparison", icon: "📊", color: "amber", blocks: [
+        { t: "table", h: ["Metric", "HDD (7200 RPM)", "SATA SSD", "NVMe SSD"], r: [
+          ["Sequential read", "~150 MB/s", "~550 MB/s", "3–7 GB/s"],
+          ["Random 4K read", "~0.5 MB/s", "~400 MB/s", "~2 GB/s"],
+          ["Random IOPS", "~100", "~100,000", "~1,000,000"],
+          ["Read latency", "~9 ms", "~0.1 ms", "~0.02 ms"],
+          ["Cost per TB", "~$20", "~$80", "~$100+"],
+        ]},
+        { t: "warn", items: [
+          "Rotational latency avg = 60/(2×RPM) seconds. Don't forget the ½ (average is half rotation).",
+          "SSD cannot overwrite in place — must erase block first. Source of write amplification.",
+          "TRIM tells SSD which LBAs are deleted → SSD can erase proactively → prevents write slowdown.",
+          "NVMe uses PCIe directly, not SATA. Completely different protocol, much lower latency.",
+          "SSD wear: each cell has limited erase cycles. Wear leveling spreads writes across all blocks.",
+        ]},
       ]},
     ],
   },
+
+  // ─────────────────────────────────────────────────────────── TOPIC 15
   {
     number: 15, short: "Linkers",
-    title: "Topic 15 – Linkers, Symbols, Resolution & Libraries",
-    overview: "Linker combines .o files into executable. Resolves symbol references. Strong/weak symbol rules determine winner. Static libs copy code; shared libs load at runtime via PLT/GOT.",
+    title: "Topic 15 – Linkers, Symbol Types, Resolution & Libraries",
+    overview: "The linker combines object files (.o) into an executable. It resolves symbolic references to addresses and patches (relocates) all the call/jump instructions. Static libraries copy code in; dynamic libraries are loaded at runtime.",
     sections: [
-      { heading: "Symbols & Relocation", color: "indigo", icon: "🔗", items: [
-        "Symbol: name bound to an address. Defined in one TU, referenced in others.",
-        "Global (external linkage): no 'static' in C. Visible across TUs.",
-        "Local (internal linkage): 'static' keyword in C. Only within TU.",
-        "External reference: used but not defined in this .o. Linker must resolve.",
-        "Relocation entry: records where in .o to patch once symbol address known.",
-        ".symtab section: each .o has symbol table of defined + referenced symbols.",
+      { heading: "Symbols & Relocation", icon: "🔗", color: "indigo", blocks: [
+        { t: "dia", label: "Compilation and linking pipeline:", c:
+`foo.c ──[cc -c]──→ foo.o ──┐
+bar.c ──[cc -c]──→ bar.o ──┼──→ [ld (linker)] ──→ executable
+libx.a ─────────────────────┘
+
+Inside each .o:
+  .text:   machine code with placeholder addresses (0x0)
+  .data:   initialized data
+  .symtab: symbol table (defined + referenced symbols)
+  .rel:    relocation entries (where to patch once addresses known)` },
+        { t: "p", c: "Relocation: after the linker assigns final addresses to all sections and symbols, it goes back through each object file and patches all the placeholder addresses using the relocation entries." },
       ]},
-      { heading: "Symbol Resolution Rules", color: "violet", icon: "⚖️", items: [
-        "Strong symbol: defined function OR initialized global variable.",
-        "Weak symbol: uninitialized global variable (or __attribute__((weak))).",
-        "Rule 1: Two strong symbols with same name → LINKER ERROR.",
-        "Rule 2: One strong + one or more weak → strong wins silently.",
-        "Rule 3: Multiple weak symbols → linker picks one arbitrarily.",
-        "Undefined symbol → linker error unless weak.",
-        "Linker scans left to right. Order matters: -llib must come AFTER the .o that uses it.",
+      { heading: "Symbol Resolution Rules", icon: "⚖️", color: "violet", blocks: [
+        { t: "p", c: "Every symbol is either strong or weak. The linker picks one definition for each symbol name using fixed precedence rules." },
+        { t: "table", h: ["Symbol type", "Example in C", "Rule"], r: [
+          ["Strong", "int x = 5;  (initialized global)", "Only one strong allowed"],
+          ["Strong", "void foo() {...}  (function def)", "Duplicate = linker error"],
+          ["Weak", "int x;  (uninitialized global)", "Strong beats weak silently"],
+          ["Weak + weak", "two uninitialized globals", "Linker picks one arbitrarily"],
+        ]},
+        { t: "warn", items: [
+          "int x; in two .h files both included → two weak symbols → one silently wins. Silent data corruption.",
+          "Linker processes left-to-right: -llib before main.o means main.o's references not yet seen → not resolved.",
+          "Undefined symbol (no definition anywhere) → linker error.",
+        ]},
       ]},
-      { heading: "Static vs Dynamic Libraries", color: "amber", icon: "📚", items: [
-        "Static lib (.a): archive of .o files. Linker copies only needed .o into executable.",
-        "Result: self-contained, no runtime dependency, larger binary.",
-        "Dynamic lib (.so Linux / .dll Windows): separate file, loaded at runtime by dynamic linker.",
-        "PLT (Procedure Linkage Table): stub for each imported function. First call: dynamic linker resolves.",
-        "GOT (Global Offset Table): holds resolved runtime addresses. PLT stubs indirect through GOT.",
-        "PIC (Position-Independent Code): -fPIC. Required for .so. Uses RIP-relative addresses.",
-        "LD_LIBRARY_PATH: runtime search path for .so files. ldd executable: shows dependencies.",
-      ]},
-      { heading: "Exam Traps", color: "red", icon: "⚠️", items: [
-        "Static lib: only .o files that satisfy undefined symbols are linked. Unused code excluded.",
-        "int x; in two .h files both #included → two weak symbols → one silently wins. Silent bug.",
-        "Dynamic lib missing at runtime → 'cannot open shared object file' even if link succeeded.",
-        "-L flag: link-time search path. LD_LIBRARY_PATH: runtime search path. DIFFERENT.",
-        "PIC required for .so — absolute addresses break when loaded at different address each run.",
-        "Linker left-to-right: libA.a before main.o → main.o's undefined symbols unresolved.",
+      { heading: "Static vs Dynamic Libraries", icon: "📚", color: "amber", blocks: [
+        { t: "dia", label: "Static vs dynamic linking:", c:
+`Static library (.a):
+  ar archive of .o files
+  Linker copies only needed .o into executable
+  Result: self-contained, no runtime dependency, larger binary
+  Link: gcc main.o -L. -lmylib -o app
+
+Dynamic library (.so / .dll):
+  Separate file, loaded by dynamic linker at program startup
+  All processes share one copy in memory (saves RAM)
+  PLT (Procedure Linkage Table) stubs → GOT (Global Offset Table)
+  First call: dynamic linker resolves symbol → patches GOT
+  Subsequent calls: direct via GOT (lazy binding)
+  Link: gcc main.o -L. -lmylib -o app  (same command, .so wins)` },
+        { t: "table", h: ["Aspect", "Static (.a)", "Dynamic (.so)"], r: [
+          ["Binary size", "larger (code copied in)", "smaller (just references)"],
+          ["Runtime deps", "none", "must have .so present"],
+          ["Startup time", "faster", "dynamic linker overhead"],
+          ["RAM sharing", "each process has copy", "shared between processes"],
+          ["Update", "must recompile", "replace .so file"],
+        ]},
+        { t: "warn", items: [
+          "Static lib: only .o files that satisfy undefined symbols are included. Unused code excluded.",
+          "Dynamic lib missing at runtime → 'cannot open shared object file' even if linked fine.",
+          "-L flag: link-time search path. LD_LIBRARY_PATH: runtime search path. Completely different.",
+          "PIC (-fPIC) required for .so — uses RIP-relative addresses so code works at any load address.",
+        ]},
       ]},
     ],
   },
+
+  // ─────────────────────────────────────────────────────────── TOPIC 16
   {
     number: 16, short: "Exceptions",
     title: "Topic 16 – Asynchronous & Synchronous Exceptions",
-    overview: "Exceptions transfer control to kernel. Synchronous: caused by current instruction (trap/fault/abort). Asynchronous (interrupts): from hardware, unrelated to current instruction.",
+    overview: "An exception is any event that causes the CPU to transfer control to an OS kernel handler. Synchronous exceptions are caused by the current instruction. Asynchronous exceptions (interrupts) come from external hardware.",
     sections: [
-      { heading: "Exception Mechanism", color: "indigo", icon: "⚡", items: [
-        "Exception: event causing CPU to transfer control to OS kernel handler.",
-        "Exception table: 256 entries (x86), each holds handler address. Indexed by exception number.",
-        "On exception: save registers + PC + privilege level → switch to ring 0 → run handler.",
-        "x86 exception numbers: 0=#DE(divide), 13=#GP(general protection), 14=#PF(page fault).",
-        "Syscall: INT 0x80 (32-bit) or SYSCALL instruction (64-bit). Intentional trap.",
-        "Exception vs interrupt: exceptions synchronous (from instruction); interrupts asynchronous.",
+      { heading: "Exception Mechanism", icon: "⚡", color: "indigo", blocks: [
+        { t: "dia", label: "What happens when an exception occurs:", c:
+`Normal execution:   instr1 → instr2 → instr3 ← exception here!
+                                           │
+                                           ▼
+    1. CPU finishes current micro-op (or not, for faults)
+    2. Save state: push RFLAGS, CS, RIP onto kernel stack
+    3. Switch to ring 0 (kernel mode), switch to kernel stack
+    4. Look up handler address in Interrupt Descriptor Table (IDT)
+    5. Jump to handler
+    6. Handler runs, may modify saved state
+    7. IRET: restore RIP, CS, RFLAGS → resume (or not)` },
+        { t: "table", h: ["x86 #", "Name", "Cause", "Type"], r: [
+          ["#DE (0)", "Divide Error", "DIV/IDIV by zero", "Fault"],
+          ["#BP (3)", "Breakpoint", "INT 3 instruction", "Trap"],
+          ["#GP (13)", "General Protection", "Privilege violation", "Fault"],
+          ["#PF (14)", "Page Fault", "Invalid VA access", "Fault"],
+          ["#MC (18)", "Machine Check", "Hardware error", "Abort"],
+        ]},
       ]},
-      { heading: "Synchronous Exception Types", color: "violet", icon: "🔄", items: [
-        "TRAP: intentional. Returns to NEXT instruction. Examples: syscall (INT 80h), breakpoint (INT 3).",
-        "FAULT: potentially recoverable. Returns to SAME instruction (retries). Examples: page fault, #GP.",
-        "ABORT: unrecoverable. Process terminated. Examples: machine check, double fault.",
-        "Divide-by-zero (#DE): sends SIGFPE to process → terminates by default.",
-        "Page fault (#PF): fault → OS loads page → CPU retries faulting instruction.",
-        "INT 3 (breakpoint): single byte 0xCC. Debugger inserts to pause execution.",
-      ]},
-      { heading: "Asynchronous Exceptions (Interrupts)", color: "amber", icon: "🔔", items: [
-        "Caused by external hardware, independent of currently-executing instruction.",
-        "Timer interrupt: CPU preemption for multitasking. OS scheduler runs.",
-        "I/O interrupt: disk/NIC signals completion. Kernel wakes sleeping process.",
-        "Maskable interrupts: disabled with CLI (EFLAGS.IF=0). Re-enabled with STI.",
-        "Non-maskable interrupt (NMI): cannot be disabled. Used for hardware errors.",
-        "After handling: returns to instruction that was interrupted. Transparent to program.",
-        "APIC (Advanced Programmable Interrupt Controller): manages IRQs on x86.",
-      ]},
-      { heading: "Exam Traps", color: "red", icon: "⚠️", items: [
-        "Trap → NEXT instruction. Fault → SAME instruction (retry). Abort → no return.",
-        "Page fault is a FAULT — OS loads page, CPU re-executes the SAME load/store.",
-        "SYSCALL is a trap — program continues from instruction AFTER syscall on return.",
-        "Interrupts are asynchronous — can arrive between any two instructions.",
-        "Kernel mode switch: privilege 3→0, stack switches to kernel stack on exception.",
-        "Divide-by-zero is classified as fault on x86 but program receives SIGFPE and dies.",
+      { heading: "Synchronous vs Asynchronous", icon: "🔄", color: "violet", blocks: [
+        { t: "dia", label: "Exception taxonomy:", c:
+`EXCEPTIONS
+├── Synchronous (caused by current instruction)
+│   ├── TRAP: intentional. Return to NEXT instruction.
+│   │   └── syscall (INT 0x80 / SYSCALL), breakpoint (INT 3)
+│   ├── FAULT: recoverable. Return to SAME instruction (retry).
+│   │   └── page fault (#PF), general protection (#GP)
+│   └── ABORT: unrecoverable. Process terminated.
+│       └── machine check (#MC), double fault (#DF)
+└── Asynchronous (from external hardware, any time)
+    └── INTERRUPT
+        ├── Timer interrupt → CPU preemption, scheduler runs
+        ├── I/O interrupt → disk/NIC signals completion
+        ├── Maskable: CLI disables (EFLAGS.IF=0), STI re-enables
+        └── NMI (Non-Maskable): cannot be disabled` },
+        { t: "warn", items: [
+          "TRAP → returns to NEXT instruction. FAULT → returns to SAME instruction (to retry). ABORT → no return.",
+          "Page fault is a FAULT: OS loads the page, then CPU re-executes the SAME faulting instruction.",
+          "SYSCALL is a trap — program continues from the instruction AFTER the syscall.",
+          "Interrupts are asynchronous — can arrive between any two instructions.",
+          "Kernel mode switch: privilege 3→0, stack switches to kernel stack. IRET reverses this.",
+        ]},
       ]},
     ],
   },
+
+  // ─────────────────────────────────────────────────────────── TOPIC 17
   {
     number: 17, short: "Processes & Threads",
     title: "Topic 17 – Processes, Threads, Race Conditions & Background Jobs",
-    overview: "Process = isolated address space + PID + file descriptors. fork() creates child. exec() replaces image. Threads share address space. Race condition: outcome depends on scheduling order.",
+    overview: "A process is a running program instance with its own address space, PID, and file descriptors. fork() creates a child by copying the parent. exec() replaces the process image. Threads share the address space — easier communication, but shared state requires synchronization.",
     sections: [
-      { heading: "Process Model", color: "indigo", icon: "🖥️", items: [
-        "Process: virtual address space, registers, open FDs, PID, PPID, signal handlers.",
-        "States: running (on CPU), ready (waiting for CPU), blocked (waiting for event/I/O).",
-        "Context switch: save current process state, restore next. Triggered by timer or blocking syscall.",
-        "fork(): creates child = copy of parent (copy-on-write). Returns child PID to parent, 0 to child.",
-        "exec(path,argv,envp): replaces process image with new program. On success, never returns.",
-        "wait(&status): parent waits for any child to exit. Returns child PID.",
-        "waitpid(pid,&status,opts): wait for specific child. WNOHANG = non-blocking.",
-        "exit(code): sends SIGCHLD to parent. Becomes zombie until parent calls wait().",
+      { heading: "Process Model & System Calls", icon: "🖥️", color: "indigo", blocks: [
+        { t: "dia", label: "Process lifecycle:", c:
+`fork()     exec()        exit()
+  │           │              │
+Parent ──→ Child ──→ [new prog] ──→ Zombie ──→ (reaped by parent wait())
+  │                                              │
+  └──────────── wait() ──────────────────────────┘
+
+Process states:
+  Running  ──preempt──→  Ready  ──schedule──→  Running
+  Running  ──block────→  Blocked ──I/O done──→  Ready` },
+        { t: "code", label: "fork() + exec() pattern:", c:
+`pid_t pid = fork();
+if (pid < 0)  { perror("fork"); exit(1); }      // error
+if (pid == 0) {                                   // child
+    execvp("ls", (char*[]){"ls", "-la", NULL});
+    perror("exec");  // only reached if exec fails
+    exit(1);
+}
+// parent continues here
+int status;
+waitpid(pid, &status, 0);    // reap child (prevent zombie)
+if (WIFEXITED(status))
+    printf("child exited: %d\n", WEXITSTATUS(status));` },
       ]},
-      { heading: "Threads", color: "violet", icon: "🧵", items: [
-        "Thread: lightweight execution unit. Shares: address space, heap, globals, FDs, signal handlers.",
-        "Thread-private: stack, registers, PC, errno, TLS.",
-        "pthread_create(&tid, NULL, func, arg): spawn. pthread_join(tid, &ret): wait.",
-        "pthread_exit(ret): exit current thread. pthread_self(): get TID.",
-        "pthread_detach(tid): thread auto-cleanup on exit (no join needed).",
-        "Threads: faster create/switch than processes (no address space copy).",
-        "Shared memory = easy IPC but requires synchronization to avoid races.",
-      ]},
-      { heading: "Race Conditions & Background Jobs", color: "amber", icon: "🏁", items: [
-        "Race condition: two threads access shared data, at least one writes, no synchronization.",
-        "Result depends on scheduling → non-deterministic bug. Hard to reproduce.",
-        "Critical section: code that must not run concurrently on shared data.",
-        "Background job: shell cmd & — shell doesn't wait. Job ID and PID printed.",
-        "Zombie: child exited, parent not called wait(). Stays in process table. No CPU but wastes slot.",
-        "Orphan: parent exits first. Init (PID 1) adopts orphan. Init calls wait() periodically.",
-        "SIGCHLD: sent to parent when child stops or terminates.",
-      ]},
-      { heading: "Exam Traps", color: "red", icon: "⚠️", items: [
-        "After fork(): BOTH parent AND child continue from the instruction AFTER fork().",
-        "fork() returns: >0 (child PID) to parent, 0 to child, -1 on error.",
-        "exec() replaces everything — code, data, heap, stack. FDs survive unless FD_CLOEXEC set.",
-        "Zombie: exists until parent calls wait(). Fills process table slot. Not a running process.",
-        "Thread stacks are separate even though address space is shared.",
-        "'It works usually' is NOT proof there is no race. Races are timing-dependent.",
+      { heading: "Threads & Race Conditions", icon: "🧵", color: "violet", blocks: [
+        { t: "dia", label: "Process vs Thread:", c:
+`Process A                    Process B
+┌────────────────────┐       ┌────────────────────┐
+│ Virtual addr space │       │ Virtual addr space │
+│ Code / Heap / Stack│       │ Code / Heap / Stack│
+│ File descriptors   │       │ File descriptors   │
+└────────────────────┘       └────────────────────┘
+       separate                      separate
+
+Thread 1          Thread 2          Thread 3
+┌────────┐        ┌────────┐        ┌────────┐
+│ Stack  │        │ Stack  │        │ Stack  │  separate per thread
+│ Regs   │        │ Regs   │        │ Regs   │
+└────────┘        └────────┘        └────────┘
+└────────────────────────────────────────────┘
+              SHARED: code, heap, globals, FDs` },
+        { t: "code", label: "Race condition example:", c:
+`int balance = 1000;
+
+// Thread A and B both run this simultaneously:
+void withdraw(int amount) {
+    if (balance >= amount) {         // ← A checks: 1000 >= 500 ✓
+        // ← context switch! B checks: 1000 >= 500 ✓
+        balance -= amount;           // both deduct!
+    }                                // balance = 0, not 500
+}` },
+        { t: "warn", items: [
+          "After fork(): BOTH parent AND child continue from the line AFTER fork().",
+          "fork() return: >0 (child PID) to parent, 0 to child, -1 on error.",
+          "exec() replaces everything — code, data, stack. FDs survive unless FD_CLOEXEC.",
+          "Zombie: child exited but parent not called wait(). Occupies process table slot.",
+          "Race condition: 'usually works' is NOT proof of correctness.",
+        ]},
       ]},
     ],
   },
+
+  // ─────────────────────────────────────────────────────────── TOPIC 18
   {
     number: 18, short: "Signals",
     title: "Topic 18 – Signals, Signal Handlers & Nonlocal Jumps",
-    overview: "Signal = software interrupt to process. SIGKILL(9) and SIGSTOP(19) cannot be caught. Handlers run asynchronously. Only async-signal-safe functions allowed in handlers. setjmp/longjmp = nonlocal goto.",
+    overview: "Signals are software interrupts. Each signal has a default action (terminate, core dump, stop, ignore). Custom handlers can be registered. SIGKILL(9) and SIGSTOP(19) cannot be caught. Only async-signal-safe functions are safe to call inside handlers.",
     sections: [
-      { heading: "Signal Basics", color: "indigo", icon: "📡", items: [
-        "Signal: asynchronous notification delivered to process. Each has a number.",
-        "SIGINT(2): Ctrl+C. SIGTERM(15): polite kill. SIGKILL(9): force kill — UNCATCHABLE.",
-        "SIGSEGV(11): segfault. SIGFPE(8): arithmetic error. SIGCHLD(17): child stopped/exited.",
-        "SIGSTOP(19): stop process — UNCATCHABLE. SIGCONT(18): resume. SIGALRM(14): timer.",
-        "Pending signal: sent but not yet delivered (e.g. currently blocked).",
-        "Only 1 pending signal per type (not queued). Additional same-type signals dropped.",
-        "Blocked signal: in signal mask. Delivered when unblocked. sigprocmask() modifies mask.",
+      { heading: "Signal Basics", icon: "📡", color: "indigo", blocks: [
+        { t: "table", h: ["Signal", "Number", "Default action", "Notes"], r: [
+          ["SIGINT", "2", "Terminate", "Ctrl+C. Catchable."],
+          ["SIGQUIT", "3", "Core dump", "Ctrl+\\"],
+          ["SIGKILL", "9", "Terminate", "UNCATCHABLE. Cannot block/ignore."],
+          ["SIGSEGV", "11", "Core dump", "Segmentation fault"],
+          ["SIGTERM", "15", "Terminate", "polite kill, catchable"],
+          ["SIGCHLD", "17", "Ignore", "Child stopped/exited"],
+          ["SIGSTOP", "19", "Stop", "UNCATCHABLE. Pause process."],
+          ["SIGCONT", "18", "Continue", "Resume stopped process"],
+          ["SIGALRM", "14", "Terminate", "alarm() timer expired"],
+          ["SIGUSR1/2", "10/12", "Terminate", "User-defined purpose"],
+        ]},
+        { t: "p", c: "Pending signal: sent but not yet delivered (e.g. currently blocked). Only ONE signal of each type can be pending — additional signals of the same type are dropped (signals are not queued). Blocked signals stay pending until the mask is cleared with sigprocmask()." },
       ]},
-      { heading: "Signal Handlers", color: "violet", icon: "🎯", items: [
-        "signal(SIGNUM, handler): register handler. SIG_DFL=default, SIG_IGN=ignore.",
-        "sigaction(SIGNUM, &act, &oldact): POSIX standard. Better control. Preferred.",
-        "SA_RESTART flag: auto-restart interrupted syscalls after handler returns.",
-        "Handler runs in same thread, asynchronously interrupting normal execution.",
-        "Async-signal-safe functions ONLY in handlers: write(), read(), _exit(), kill(), sigprocmask().",
-        "printf(), malloc(), free() are NOT safe in handlers (use non-reentrant globals).",
-        "volatile sig_atomic_t flag: safe to set in handler, read in main loop.",
+      { heading: "Signal Handlers & Safety", icon: "🎯", color: "violet", blocks: [
+        { t: "code", label: "Correct handler registration with sigaction:", c:
+`struct sigaction sa = {0};
+sa.sa_handler = my_handler;
+sigemptyset(&sa.sa_mask);
+sa.sa_flags = SA_RESTART;   // auto-restart interrupted syscalls
+sigaction(SIGINT, &sa, NULL);
+
+// In handler — ONLY async-signal-safe functions:
+void my_handler(int sig) {
+    // SAFE:
+    write(STDOUT_FILENO, "caught!\n", 8);
+    _exit(0);
+
+    // UNSAFE (do NOT use in handlers):
+    // printf()   — uses global buffer (not reentrant)
+    // malloc()   — can deadlock if interrupted mid-alloc
+    // exit()     — calls atexit handlers (not safe)
+}` },
+        { t: "p", c: "The safe pattern for signal handlers: set a volatile sig_atomic_t flag in the handler, and check that flag in the main event loop. The flag type is guaranteed to be read/written atomically with respect to signal delivery." },
+        { t: "code", c:
+`volatile sig_atomic_t got_signal = 0;
+
+void handler(int sig) { got_signal = 1; }  // just set flag
+
+int main() {
+    // ... register handler ...
+    while (1) {
+        if (got_signal) { got_signal = 0; /* handle it */ }
+        // ... normal work ...
+    }
+}` },
       ]},
-      { heading: "Nonlocal Jumps", color: "amber", icon: "🔀", items: [
-        "setjmp(jmp_buf env): saves execution state (regs, SP, PC). Returns 0.",
-        "longjmp(env, val): restores saved state. setjmp appears to return val (never 0).",
-        "Use: error recovery across call stack without propagating error returns.",
-        "sigsetjmp/siglongjmp: like setjmp/longjmp but also save/restore signal mask.",
-        "Danger: longjmp skips all cleanup code between setjmp and longjmp site (destructors, frees).",
-        "sig_atomic_t: type guaranteed to be read/written atomically w.r.t. signal delivery.",
-      ]},
-      { heading: "Exam Traps", color: "red", icon: "⚠️", items: [
-        "SIGKILL(9) and SIGSTOP(19) cannot be caught, blocked, or ignored. Period.",
-        "Signals NOT queued: 5 SIGINTs while SIGINT blocked → only 1 delivered on unblock.",
-        "printf() in signal handler = unsafe (uses global buffer, not reentrant). Use write().",
-        "longjmp (not siglongjmp) from signal handler leaves signal mask as set by handler.",
-        "signal() vs sigaction(): signal() behavior varies by implementation. Use sigaction().",
-        "After fork(): child inherits handlers and mask. After exec(): handlers reset to SIG_DFL.",
+      { heading: "Nonlocal Jumps", icon: "🔀", color: "amber", blocks: [
+        { t: "code", label: "setjmp/longjmp — goto across function boundaries:", c:
+`#include <setjmp.h>
+jmp_buf env;
+
+void deep_function() {
+    // ... something goes wrong ...
+    longjmp(env, 42);    // jump back to setjmp site, return value=42
+    // code after longjmp NEVER executes
+}
+
+int main() {
+    int val = setjmp(env);  // saves CPU state; returns 0 first time
+    if (val == 0) {
+        deep_function();    // may longjmp back here
+    } else {
+        printf("recovered with code %d\n", val);  // val=42
+    }
+}` },
+        { t: "warn", items: [
+          "SIGKILL(9) and SIGSTOP(19): cannot be caught, blocked, or ignored. Period.",
+          "Signals NOT queued: 5 SIGINTs while SIGINT blocked → only 1 delivered on unblock.",
+          "printf() in handler is UNSAFE — uses global buffer, can deadlock if interrupted.",
+          "Use siglongjmp/sigsetjmp (not longjmp/setjmp) from signal handlers — restores signal mask.",
+          "After fork(): child inherits handlers + mask. After exec(): handlers reset to SIG_DFL.",
+        ]},
       ]},
     ],
   },
+
+  // ─────────────────────────────────────────────────────────── TOPIC 19
   {
     number: 19, short: "I/O",
     title: "Topic 19 – Input/Output & Standard I/O",
-    overview: "Unix I/O: integer file descriptors, syscalls (open/read/write/close) — unbuffered. stdio: FILE* with buffering. Stdout is line-buffered to terminal, fully-buffered to file. Everything is a file.",
+    overview: "Unix I/O uses integer file descriptors — 0=stdin, 1=stdout, 2=stderr. System calls (read/write/open/close) are unbuffered. stdio (FILE*) adds a user-space buffer. Buffering mode depends on whether the output is a terminal or a file.",
     sections: [
-      { heading: "Unix I/O (Syscall Level)", color: "indigo", icon: "📁", items: [
-        "File descriptor: non-negative integer. 0=stdin, 1=stdout, 2=stderr.",
-        "open(path, flags, mode): returns new FD. O_RDONLY, O_WRONLY, O_RDWR, O_CREAT, O_TRUNC.",
-        "read(fd, buf, n): up to n bytes → returns bytes read. 0=EOF. -1=error.",
-        "write(fd, buf, n): write n bytes → returns bytes written (may be less). -1=error.",
-        "close(fd): release FD. lseek(fd, offset, whence): reposition (SEEK_SET/CUR/END).",
-        "stat(path, &sb): metadata (size, type, permissions, timestamps).",
-        "FDs inherited by fork(). Survive exec() unless FD_CLOEXEC set.",
+      { heading: "Unix I/O (Kernel Level)", icon: "📁", color: "indigo", blocks: [
+        { t: "table", h: ["Syscall", "Signature", "Returns", "Notes"], r: [
+          ["open", "open(path, flags, mode)", "fd or -1", "O_RDONLY/WRONLY/RDWR/CREAT/TRUNC"],
+          ["read", "read(fd, buf, n)", "bytes read, 0=EOF, -1=err", "May be less than n"],
+          ["write", "write(fd, buf, n)", "bytes written or -1", "May be less than n"],
+          ["close", "close(fd)", "0 or -1", "Releases fd slot"],
+          ["lseek", "lseek(fd, offset, whence)", "new offset or -1", "SEEK_SET/CUR/END"],
+          ["stat", "stat(path, &sb)", "0 or -1", "Get file metadata"],
+          ["dup2", "dup2(oldfd, newfd)", "newfd or -1", "Redirect I/O"],
+        ]},
+        { t: "code", label: "Robust read loop (handles partial reads):", c:
+`ssize_t readn(int fd, void *buf, size_t n) {
+    size_t remaining = n;
+    char *p = buf;
+    while (remaining > 0) {
+        ssize_t r = read(fd, p, remaining);
+        if (r < 0)  return -1;   // error
+        if (r == 0) break;       // EOF
+        p += r;
+        remaining -= r;
+    }
+    return n - remaining;
+}` },
       ]},
-      { heading: "Standard I/O (stdio)", color: "violet", icon: "📜", items: [
-        "FILE*: opaque handle wrapping FD with user-space buffer.",
-        "Fully buffered: data held until buffer full or fflush(). Default for regular files.",
-        "Line buffered: flushed on newline or full buffer. Default stdout to terminal.",
-        "Unbuffered: no buffer. Default stderr.",
-        "fopen/fread/fwrite/fclose. fprintf/printf/scanf/fscanf.",
-        "fflush(fp): force write buffer to kernel. fflush(NULL): flush all output streams.",
-        "fgets(buf, n, fp): reads up to n-1 chars + null. Includes newline if present.",
-        "setvbuf(fp, buf, mode, size): set buffer mode (_IOFBF/_IOLBF/_IONBF).",
-      ]},
-      { heading: "Pipes & Redirection", color: "amber", icon: "🔧", items: [
-        "dup2(oldfd, newfd): newfd now refers to same file as oldfd. Closes newfd first.",
-        "Shell cmd > file: opens file, dup2 to fd 1 (stdout).",
-        "pipe(fds[2]): fds[0]=read end, fds[1]=write end. Kernel buffer ~64KB.",
-        "Pipe between processes: fork after pipe(). Parent→fds[1], child→fds[0]. Close unused ends!",
-        "EOF from pipe: all write ends closed → reader gets EOF (read returns 0).",
-        "select()/poll()/epoll(): monitor multiple FDs. epoll O(1) per event. select O(n) up to 1024.",
-        "FIFO (named pipe): mkfifo(). Persists in filesystem. Cross-process without fork.",
-      ]},
-      { heading: "Exam Traps", color: "red", icon: "⚠️", items: [
-        "printf() buffered — output may not appear immediately. Use fflush(stdout) or newline.",
-        "read() may return LESS than n bytes (partial read). Always loop to read full amount.",
-        "If parent forgets to close write end of pipe after fork, child never sees EOF.",
-        "stdout line-buffered to terminal, fully-buffered when redirected. printf behavior differs.",
-        "fgets includes the '\\n'. Strip it with: buf[strcspn(buf,\"\\n\")]=0.",
-        "FDs are integers — NOT FILE*. Mixing write()/fprintf() on same FD can corrupt output.",
+      { heading: "stdio Buffering & Pipes", icon: "📜", color: "violet", blocks: [
+        { t: "dia", label: "Buffering modes:", c:
+`_IOFBF (fully buffered):
+  Data held in buffer until full or fflush()
+  Default for regular files
+
+_IOLBF (line buffered):
+  Flushed on newline character or full buffer
+  Default for stdout when connected to a terminal
+
+_IONBF (unbuffered):
+  Every write goes immediately to kernel
+  Default for stderr
+
+Consequence: if you redirect stdout to a file, printf() becomes
+fully buffered — output may not appear until program exits!
+Use fflush(stdout) or setvbuf(stdout, NULL, _IONBF, 0)` },
+        { t: "code", label: "Pipe between parent and child:", c:
+`int pfd[2];
+pipe(pfd);          // pfd[0]=read, pfd[1]=write
+
+pid_t pid = fork();
+if (pid == 0) {     // child: reader
+    close(pfd[1]);  // MUST close write end in child
+    char buf[128];
+    int n = read(pfd[0], buf, sizeof(buf));
+    close(pfd[0]);
+    exit(0);
+} else {            // parent: writer
+    close(pfd[0]);  // MUST close read end in parent
+    write(pfd[1], "hello\n", 6);
+    close(pfd[1]);  // close write end → child sees EOF
+    wait(NULL);
+}` },
+        { t: "warn", items: [
+          "printf() buffered — output may not appear immediately. fflush(stdout) forces it.",
+          "read() may return LESS than n. Always loop until full amount read.",
+          "Forget to close write end of pipe in parent → child never sees EOF → hangs forever.",
+          "stdout is line-buffered to terminal, fully-buffered when redirected to file.",
+          "fgets() includes the '\\n'. Strip with: buf[strcspn(buf, \"\\n\")] = 0.",
+        ]},
       ]},
     ],
   },
+
+  // ─────────────────────────────────────────────────────────── TOPIC 20
   {
     number: 20, short: "Virtual Memory",
     title: "Topic 20 – Virtual Memory & Address Translation",
-    overview: "Each process has private virtual address space. CPU translates VA→PA via page tables (4-level on x86-64). TLB caches recent translations. Page fault: P-bit=0 → OS handler loads page from disk.",
+    overview: "Every process sees a private virtual address space. The CPU's MMU translates virtual→physical addresses using page tables in memory. The TLB caches recent translations for speed. A page fault occurs when a PTE's present bit is 0 — the OS loads the page and retries.",
     sections: [
-      { heading: "Pages & Page Tables", color: "indigo", icon: "📄", items: [
-        "Page = 4KB (12-bit offset). Physical memory split into same-size frames.",
-        "Page table: array indexed by VPN (virtual page number). Entry = PTE.",
-        "PTE fields: present bit(P), physical frame number(PFN), dirty, accessed, R/W/X/U bits.",
-        "If P=0: page not in RAM → page fault on access.",
-        "x86-64: 4-level. CR3 = physical addr of PML4 table.",
-        "4 levels: PML4[9] → PDPT[9] → PD[9] → PT[9] + offset[12] = 48-bit virtual address.",
-        "Each level is a 4KB page with 512 × 8-byte PTEs.",
+      { heading: "Pages & Page Tables", icon: "📄", color: "indigo", blocks: [
+        { t: "dia", label: "x86-64 4-level page table walk:", c:
+`Virtual Address (48 bits used):
+┌──────────┬──────────┬──────────┬──────────┬────────────┐
+│ PML4 idx │ PDPT idx │  PD idx  │  PT idx  │   Offset   │
+│  9 bits  │  9 bits  │  9 bits  │  9 bits  │  12 bits   │
+└──────────┴──────────┴──────────┴──────────┴────────────┘
+
+CR3 register
+    │
+    └──→ PML4 table [PML4 idx]
+              │
+              └──→ PDPT table [PDPT idx]
+                        │
+                        └──→ PD table [PD idx]
+                                  │
+                                  └──→ PT table [PT idx]
+                                            │
+                                           PTE
+                                            │
+                          Physical Addr = PTE.PFN | Offset` },
+        { t: "p", c: "Each level is itself a 4KB page containing 512 × 8-byte entries. The VPN (virtual page number) is split into 4 × 9-bit chunks — one index per level. Without the TLB, every memory access requires 4 DRAM reads just to translate the address." },
+        { t: "dia", label: "Page Table Entry (PTE) bit fields:", c:
+`Bits 63-12: Physical Frame Number (PFN)
+Bit  11:    (available)
+Bit   7:    Page Size (PS): 0=4KB, 1=2MB/1GB huge page
+Bit   6:    Dirty (D): set when page was written
+Bit   5:    Accessed (A): set when page was read or written
+Bit   4:    Cache Disable
+Bit   3:    Write Through
+Bit   2:    User/Supervisor (U): 0=kernel only, 1=user accessible
+Bit   1:    Read/Write (W): 0=read-only, 1=writable
+Bit   0:    Present (P): 0=page fault on access, 1=in RAM` },
       ]},
-      { heading: "TLB & Address Translation", color: "violet", icon: "⚡", items: [
-        "TLB: small hardware cache of VPN→PFN translations. 32–1024 entries typical.",
-        "TLB hit: 1 cycle to get PA. TLB miss: 4 memory accesses (one per page table level).",
-        "Translation: VA → VPN+VPO → TLB lookup → PFN → PA = PFN:VPO.",
-        "VPO (virtual page offset) = low 12 bits. Passes through unchanged to PA.",
-        "ASID (Address Space ID): tag TLB entries per process. Avoids full flush on context switch.",
-        "INVLPG addr: invalidate single TLB entry. CR3 write: flush all TLB.",
-        "Page fault handler: allocate frame, load page from disk, set PTE, return. CPU retries.",
+      { heading: "TLB & Page Faults", icon: "⚡", color: "violet", blocks: [
+        { t: "dia", label: "Address translation with TLB:", c:
+`CPU generates VA
+        │
+        ▼
+   [TLB lookup with VPN]
+        │
+   ┌────┴────┐
+   Hit       Miss
+   │         │
+   │    [Page table walk: 4 memory reads]
+   │         │
+   └────┬────┘
+        │
+   PTE found?
+   ┌────┴────┐
+  P=1       P=0
+   │         │
+   PA       [Page fault #PF]
+             │
+          OS handler:
+          1. Find a free frame
+          2. Load page from disk/swap
+          3. Set PTE.P=1, set PFN
+          4. Return → CPU retries instruction` },
+        { t: "p", c: "Copy-on-write (COW): after fork(), parent and child share physical pages mapped read-only. The first write to a shared page triggers a page fault. The OS detects COW, allocates a new frame, copies the page, remaps it as writable. This makes fork() fast (no actual copying)." },
       ]},
-      { heading: "Protection & Demand Paging", color: "amber", icon: "🛡️", items: [
-        "Per-page protection bits: R(read), W(write), X(execute), U(user/supervisor).",
-        "Write to read-only page → #PF with write bit → OS sends SIGSEGV.",
-        "Demand paging: pages loaded only on first access (page fault). Reduces startup time.",
-        "Copy-on-write (COW): fork() shares pages marked read-only. First write → fault → copy page.",
-        "Swap: evicted pages go to disk swap space. Page daemon selects LRU pages when RAM low.",
-        "Huge pages: 2MB or 1GB. Fewer TLB entries for same memory. Less TLB pressure.",
-        "mmap(NULL,len,prot,MAP_ANON|MAP_PRIVATE,-1,0): allocate anonymous zero pages.",
-      ]},
-      { heading: "Exam Traps", color: "red", icon: "⚠️", items: [
-        "TLB miss ≠ page fault. TLB miss → hardware page table walk. Page fault → P=0 → OS handler.",
-        "VPO bits = log₂(page_size). 4KB page → 12 bits. Unchanged from VA to PA.",
-        "COW write fault: page IS present (P=1) but read-only → write fault → OS copies page.",
-        "4-level table walk = 4 DRAM accesses without TLB. TLB critical for performance.",
-        "Physical address space can be SMALLER than virtual. Many VAs map nowhere.",
-        "After exec(), page table replaced. Old mappings gone. Stack/heap re-initialized.",
+      { heading: "Protection & Demand Paging", icon: "🛡️", color: "amber", blocks: [
+        { t: "table", h: ["Protection scenario", "What happens"], r: [
+          ["Access with P=0", "Page fault #PF. OS loads page. Instruction retried."],
+          ["Write to W=0 page", "Page fault #PF. OS sends SIGSEGV to process."],
+          ["User code accesses U=0 page", "General protection fault #GP"],
+          ["Execute from NX page", "Page fault #PF (NX bit in PTE)"],
+          ["COW write", "Page fault #PF → OS copies page → remaps R/W"],
+        ]},
+        { t: "warn", items: [
+          "TLB miss ≠ page fault. TLB miss → hardware page table walk. Page fault → P=0 → OS handler.",
+          "VPO (page offset) = low 12 bits for 4KB pages. These bits pass unchanged to physical address.",
+          "COW write faults even though page IS present (P=1) — it's read-only (W=0).",
+          "4-level page table walk = 4 DRAM accesses without TLB. TLB is critical for speed.",
+          "After exec(): new page table installed. Old mappings gone. Code/stack re-initialized.",
+        ]},
       ]},
     ],
   },
+
+  // ─────────────────────────────────────────────────────────── TOPIC 21
   {
     number: 21, short: "Concurrent Programming",
     title: "Topic 21 – Concurrent Programming",
-    overview: "Concurrent = multiple flows overlapping in time (not necessarily parallel). Three models: processes, threads, I/O multiplexing. Thread safety and reentrancy are distinct. Deadlock requires 4 conditions.",
+    overview: "Concurrent programs have multiple execution flows active at overlapping times. Three approaches: processes (isolated), threads (shared memory), I/O multiplexing (single thread, event loop). Thread safety and reentrancy are distinct properties.",
     sections: [
-      { heading: "Concurrency Models", color: "indigo", icon: "🔀", items: [
-        "Concurrency: multiple tasks in progress at overlapping times. Can happen on 1 core (interleaving).",
-        "Parallelism: multiple tasks executing at the SAME instant. Requires multiple cores.",
-        "Process-based: fork() per client. Strong isolation. IPC overhead (pipes/sockets).",
-        "Thread-based: shared memory, easy communication, synchronization required.",
-        "I/O multiplexing: single process, event loop, select()/poll()/epoll(). No sync needed. Complex code.",
-        "epoll (Linux): O(1) per ready event. Scales to millions of FDs. select() limited to 1024 FDs.",
+      { heading: "Concurrency Models", icon: "🔀", color: "indigo", blocks: [
+        { t: "dia", label: "Three approaches:", c:
+`1. Process-based:
+   fork() per client. Strong isolation. IPC = pipes/sockets (overhead).
+   Good when: isolation critical, existing programs, OS does scheduling.
+
+2. Thread-based:
+   pthread_create() per client. Shared memory, easy IPC.
+   Need synchronization. Good for CPU-bound parallel work.
+
+3. I/O multiplexing (event-driven):
+   Single process, event loop with epoll()/select().
+   No synchronization needed. Complex control flow.
+   Good for: I/O-bound servers with many connections (nginx model).
+
+Concurrency ≠ Parallelism:
+  Concurrent: multiple flows, may INTERLEAVE on 1 core
+  Parallel:   multiple flows execute SIMULTANEOUSLY (need multiple cores)` },
       ]},
-      { heading: "Pthreads API", color: "violet", icon: "🧵", items: [
-        "pthread_create(&tid, attr, func, arg): spawn thread. NULL attr = defaults.",
-        "pthread_join(tid, &retval): wait for thread exit. Gets return value.",
-        "pthread_detach(tid): auto-release resources on exit. No join needed/possible.",
-        "pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;",
-        "pthread_mutex_lock(&m): blocks if locked. pthread_mutex_unlock(&m): releases.",
-        "pthread_mutex_trylock(&m): non-blocking. Returns EBUSY if already locked.",
-        "__thread int x: thread-local storage (GCC). Each thread has own copy.",
+      { heading: "Pthreads & Shared State", icon: "🧵", color: "violet", blocks: [
+        { t: "code", label: "Basic thread lifecycle:", c:
+`#include <pthread.h>
+
+void *worker(void *arg) {
+    int id = *(int *)arg;
+    printf("Thread %d working\n", id);
+    return (void *)(intptr_t)(id * 2);   // return value
+}
+
+int main() {
+    pthread_t tid;
+    int arg = 42;
+    pthread_create(&tid, NULL, worker, &arg);
+    // ... do other work ...
+    void *retval;
+    pthread_join(tid, &retval);   // wait + get return value
+    printf("returned: %ld\n", (intptr_t)retval);
+}` },
+        { t: "table", h: ["Function", "Purpose"], r: [
+          ["pthread_create(&tid, attr, fn, arg)", "Spawn thread"],
+          ["pthread_join(tid, &ret)", "Wait for thread, get return value"],
+          ["pthread_detach(tid)", "Auto-cleanup on exit (no join needed)"],
+          ["pthread_exit(ret)", "Exit current thread"],
+          ["pthread_self()", "Get own thread ID"],
+          ["pthread_cancel(tid)", "Request cancellation"],
+        ]},
       ]},
-      { heading: "Thread Safety & Reentrancy", color: "amber", icon: "✅", items: [
-        "Thread-safe: correct results when called concurrently. Achieved with locking.",
-        "Non-thread-safe: uses global/static state without sync. Examples: rand(), strtok(), localtime().",
-        "Reentrant: thread-safe WITHOUT synchronization. Only uses local vars + args. No shared state.",
-        "Reentrant ⊂ thread-safe. Thread-safe does NOT imply reentrant.",
-        "Use _r variants for thread safety: strtok_r(), localtime_r(), rand_r().",
-        "Deadlock: A holds lock1 waits lock2. B holds lock2 waits lock1. Circular wait.",
-        "Prevention: always acquire locks in same global order.",
-      ]},
-      { heading: "Exam Traps", color: "red", icon: "⚠️", items: [
-        "Concurrent ≠ parallel. Single-core can be concurrent (interleaved), not parallel.",
-        "Reentrant ⊂ thread-safe. NOT equivalent. Mutex = thread-safe, NOT reentrant.",
-        "pthread_join required unless thread is detached. Otherwise zombie threads accumulate.",
-        "Mutex doesn't prevent deadlock — wrong LOCK ORDER causes deadlock.",
-        "errno in glibc is thread-local (implementation detail). Don't assume this everywhere.",
-        "select() FD_SETSIZE=1024. epoll has no such limit. Use epoll for high concurrency.",
+      { heading: "Thread Safety & Reentrancy", icon: "✅", color: "amber", blocks: [
+        { t: "p", c: "Thread-safe: a function produces correct results when called concurrently from multiple threads. Reentrant: a stronger guarantee — safe even if interrupted mid-execution and called again (no shared state at all, uses only local variables). Reentrant implies thread-safe, but not vice versa." },
+        { t: "table", h: ["Function", "Thread-safe?", "Reentrant?", "Fix"], r: [
+          ["rand()", "NO", "NO", "rand_r(seed) or thread-local seed"],
+          ["strtok()", "NO", "NO", "strtok_r(str, delim, &saveptr)"],
+          ["localtime()", "NO", "NO", "localtime_r(timer, result)"],
+          ["malloc()/free()", "YES (glibc)", "NO", "uses internal lock"],
+          ["printf()", "YES (glibc)", "NO", "uses FILE lock"],
+          ["memcpy()", "YES", "YES", "pure local ops"],
+          ["strlen()", "YES", "YES", "read-only, no shared state"],
+        ]},
+        { t: "warn", items: [
+          "Concurrent ≠ parallel. Single core can be concurrent (interleaved), not parallel.",
+          "Reentrant ⊂ thread-safe. Adding a mutex makes something thread-safe but NOT reentrant.",
+          "pthread_join is required unless thread is detached. Otherwise zombie threads accumulate.",
+          "select() FD_SETSIZE = 1024 limit. epoll has no limit. Use epoll for high concurrency.",
+        ]},
       ]},
     ],
   },
+
+  // ─────────────────────────────────────────────────────────── TOPIC 22
   {
     number: 22, short: "Parallelism & Sync",
     title: "Topic 22 – Parallelism & Synchronization",
-    overview: "Mutex = binary lock for critical sections. Semaphore = counter. Condition variable = wait for condition (always use while, not if). Amdahl's Law: serial fraction limits max speedup.",
+    overview: "Synchronization primitives protect shared data. Mutex = binary lock. Semaphore = counting lock. Condition variable = wait for condition (ALWAYS use while, not if). Amdahl's Law: the serial fraction of code hard-limits the maximum achievable speedup.",
     sections: [
-      { heading: "Mutex & Semaphore", color: "indigo", icon: "🔒", items: [
-        "Mutex: ensures only 1 thread in critical section. pthread_mutex_lock/unlock.",
-        "Semaphore: integer counter. sem_wait(s): s-- (blocks if s=0). sem_post(s): s++.",
-        "Binary semaphore (init=1): equivalent to mutex.",
-        "Counting semaphore: limit concurrent access. E.g. max 5 threads in DB connection pool.",
-        "sem_init(&s, pshared, value). sem_destroy(&s).",
-        "Spinlock: busy-wait. pthread_spinlock_t. Good for short sections on multicore. Bad on uniprocessor.",
-        "sem_post() is async-signal-safe. pthread_mutex_unlock() is NOT.",
+      { heading: "Mutex, Semaphore & Spinlock", icon: "🔒", color: "indigo", blocks: [
+        { t: "code", label: "Mutex usage pattern:", c:
+`pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+int shared_counter = 0;
+
+void increment() {
+    pthread_mutex_lock(&lock);   // blocks if locked
+    shared_counter++;            // critical section
+    pthread_mutex_unlock(&lock); // releases
+}
+
+// Trylock (non-blocking attempt):
+if (pthread_mutex_trylock(&lock) == 0) {
+    // got it
+    pthread_mutex_unlock(&lock);
+} else {
+    // EBUSY: already locked, do something else
+}` },
+        { t: "table", h: ["Primitive", "Function", "Behavior"], r: [
+          ["Mutex", "pthread_mutex_lock/unlock", "Binary: 0 or 1. Blocks on lock."],
+          ["Semaphore", "sem_wait / sem_post", "Counter. Blocks when 0."],
+          ["Spinlock", "pthread_spin_lock/unlock", "Busy-waits. Good for short sections."],
+          ["RW Lock", "pthread_rwlock_rdlock / wrlock", "Multiple readers OR one writer"],
+        ]},
       ]},
-      { heading: "Condition Variables", color: "violet", icon: "⏳", items: [
-        "pthread_cond_t: thread waits until a condition is true.",
-        "pthread_cond_wait(&cond, &mutex): atomically releases mutex + sleeps. On wake: reacquires mutex.",
-        "pthread_cond_signal(&cond): wake one waiter. pthread_cond_broadcast: wake all.",
-        "ALWAYS use while, not if: while(!condition) { pthread_cond_wait(&cond,&mutex); }",
-        "Why while: spurious wakeups (OS may wake thread without signal). Must re-check condition.",
-        "Must hold mutex before calling cond_wait. Mutex auto-released during sleep.",
-        "Reader-writer lock: pthread_rwlock_t. Multiple readers OR single writer.",
+      { heading: "Condition Variables", icon: "⏳", color: "violet", blocks: [
+        { t: "p", c: "Condition variables solve the 'wait until X is true' problem. CRITICAL: always use a while loop, never if. Spurious wakeups (the OS waking a thread without pthread_cond_signal) are allowed by POSIX. Always re-check the condition after waking." },
+        { t: "code", label: "Producer-consumer with condition variable:", c:
+`pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t  nonempty = PTHREAD_COND_INITIALIZER;
+pthread_cond_t  nonfull  = PTHREAD_COND_INITIALIZER;
+int buf[N], head=0, tail=0, count=0;
+
+void produce(int item) {
+    pthread_mutex_lock(&lock);
+    while (count == N)                          // WHILE not if!
+        pthread_cond_wait(&nonfull, &lock);     // atomically release + sleep
+    buf[tail++ % N] = item;  count++;
+    pthread_cond_signal(&nonempty);
+    pthread_mutex_unlock(&lock);
+}
+
+void *consume() {
+    pthread_mutex_lock(&lock);
+    while (count == 0)                          // WHILE not if!
+        pthread_cond_wait(&nonempty, &lock);
+    int item = buf[head++ % N];  count--;
+    pthread_cond_signal(&nonfull);
+    pthread_mutex_unlock(&lock);
+    return item;
+}` },
       ]},
-      { heading: "Deadlock & Amdahl's Law", color: "amber", icon: "📊", items: [
-        "Deadlock: 4 conditions all required: (1)mutual exclusion (2)hold-and-wait (3)no preemption (4)circular wait.",
-        "Prevention: break any one. Easiest: enforce global lock ordering (breaks circular wait).",
-        "Amdahl's Law: S(N) = 1 / (f + (1-f)/N). f=serial fraction, N=processors.",
-        "10% serial (f=0.1): max speedup = 10×. 50% serial: max = 2×. No matter how many cores.",
-        "Data parallelism: same op on different data (SIMD, loop parallelism).",
-        "Task parallelism: different tasks on different threads.",
-        "False sharing: threads write different vars in same 64B cache line → line bounces between cores.",
-      ]},
-      { heading: "Exam Traps", color: "red", icon: "⚠️", items: [
-        "ALWAYS while() not if() with pthread_cond_wait. Spurious wakeups are real.",
-        "pthread_cond_wait must be called with mutex LOCKED. Releases atomically during sleep.",
-        "Amdahl with 8 cores, 20% serial: S = 1/(0.2 + 0.8/8) = 1/0.3 = 3.33×",
-        "Deadlock: holding one lock while waiting for another. Solution: always acquire in same order.",
-        "Spinlock on uniprocessor: spinning thread prevents lock holder from running → indefinite wait.",
-        "sem_post from signal handler is OK. mutex_unlock from signal handler is NOT (async-signal-unsafe).",
+      { heading: "Deadlock & Amdahl's Law", icon: "📊", color: "amber", blocks: [
+        { t: "p", c: "Deadlock requires all 4 conditions simultaneously: mutual exclusion, hold-and-wait, no preemption, circular wait. Break ANY one to prevent deadlock. The easiest: enforce a global lock ordering (never acquire lock B while holding lock A if anywhere you also acquire A while holding B)." },
+        { t: "dia", label: "Amdahl's Law — speedup vs cores:", c:
+`Speedup S(N) = 1 / (f + (1-f)/N)
+f = serial fraction, N = number of processors
+
+            N=1    N=2    N=4    N=8    N=16   N=∞
+f=0.5 (50%)  1×    1.33×  1.60×  1.78×  1.88×   2×  ← hard wall
+f=0.1 (10%)  1×    1.82×  3.08×  4.71×  6.40×  10×
+f=0.01 (1%)  1×    1.98×  3.88×  7.41× 13.91× 100×
+
+→ Even 1% serial code limits you to 100× max, regardless of cores.
+→ The serial fraction dominates at high core counts.` },
+        { t: "warn", items: [
+          "ALWAYS use while() not if() with pthread_cond_wait. Spurious wakeups are real.",
+          "pthread_cond_wait must be called with mutex LOCKED. Releases atomically during sleep.",
+          "Amdahl example — 8 cores, 20% serial: S = 1/(0.2 + 0.8/8) = 1/0.3 = 3.33×",
+          "False sharing: two threads write different vars in same 64B cache line → cache ping-pong.",
+          "sem_post() is async-signal-safe. pthread_mutex_unlock() is NOT (unsafe in signal handlers).",
+        ]},
       ]},
     ],
   },
+
+  // ─────────────────────────────────────────────────────────── TOPIC 23
   {
     number: 23, short: "Virtual Machines",
     title: "Topic 23 – Virtual Machines",
-    overview: "VM = software emulation of hardware. Hypervisor type 1 runs on bare metal (fast, data center). Type 2 runs on host OS (easy setup, dev/test). Intel VT-x / AMD-V enable hardware-assisted virtualization.",
+    overview: "A virtual machine runs a complete guest OS on emulated hardware. The hypervisor (VMM) manages VMs. Type 1 runs on bare metal (faster, data centers). Type 2 runs on a host OS (easier, development). Intel VT-x and AMD-V provide hardware acceleration.",
     sections: [
-      { heading: "VM Concepts & Hypervisor Types", color: "indigo", icon: "🖥️", items: [
-        "Virtual Machine: complete emulated computer. Guest OS runs unaware of virtualization.",
-        "Hypervisor (VMM): software that creates, manages, and isolates VMs.",
-        "Type 1 (bare-metal): hypervisor runs DIRECTLY on hardware. No host OS.",
-        "Type 1 examples: VMware ESXi, Microsoft Hyper-V, KVM (Linux kernel = hypervisor).",
-        "Type 2 (hosted): hypervisor runs as app on host OS. Higher overhead.",
-        "Type 2 examples: VirtualBox, VMware Workstation, Parallels.",
-        "Type 1: lower overhead, better performance, used in production/data centers.",
-        "Type 2: easier to install, good for desktop/development use.",
+      { heading: "Hypervisor Types", icon: "🖥️", color: "indigo", blocks: [
+        { t: "dia", label: "Type 1 vs Type 2 hypervisors:", c:
+`Type 1 (Bare-metal):            Type 2 (Hosted):
+┌──────┬──────┬──────┐          ┌──────┬──────┬──────┐
+│ VM1  │ VM2  │ VM3  │          │ VM1  │ VM2  │ VM3  │
+├──────┴──────┴──────┤          ├──────┴──────┴──────┤
+│    Hypervisor      │          │    Hypervisor       │
+├────────────────────┤          ├────────────────────┤
+│     Hardware       │          │    Host OS          │
+└────────────────────┘          ├────────────────────┤
+                                │    Hardware         │
+                                └────────────────────┘
+
+Type 1 examples: VMware ESXi, Hyper-V, KVM (Linux kernel IS hypervisor)
+Type 2 examples: VirtualBox, VMware Workstation, Parallels
+
+Type 1: lower overhead, better isolation, production/data centers
+Type 2: easier install, good for dev/test, worse performance` },
       ]},
-      { heading: "Virtualization Techniques", color: "violet", icon: "⚙️", items: [
-        "Full virtualization: guest OS unmodified. Hypervisor emulates all hardware.",
-        "Trap-and-emulate: privileged guest instructions trap to hypervisor for emulation.",
-        "Binary translation (VMware pre-VT-x): rewrites privileged instruction blocks on the fly.",
-        "Paravirtualization: guest OS modified to use hypercalls. Xen PV mode. Faster but needs OS port.",
-        "Hardware-assisted: CPU has dedicated VM support. Intel VT-x (vmx), AMD-V (svm).",
-        "VMCS (VM Control Structure): per-VM data structure. VMLAUNCH/VMRESUME enter guest.",
-        "VM exit: guest executes privileged/sensitive instruction → hardware saves state → hypervisor handles.",
-        "VM exit expensive: hundreds to thousands of cycles each.",
+      { heading: "Virtualization Techniques", icon: "⚙️", color: "violet", blocks: [
+        { t: "table", h: ["Technique", "Guest OS modified?", "Mechanism", "Performance"], r: [
+          ["Full virt (binary trans.)", "NO", "Rewrite privileged instructions", "Moderate"],
+          ["Full virt (HW-assisted)", "NO", "VT-x/AMD-V traps", "Good"],
+          ["Paravirtualization", "YES (hypercalls)", "Guest calls hypervisor explicitly", "Good"],
+          ["Passthrough (VFIO)", "NO", "Direct hardware access", "Native"],
+        ]},
+        { t: "dia", label: "Hardware-assisted virtualization (Intel VT-x):", c:
+`Guest runs in VMX non-root mode (ring 0 inside VM)
+        │
+   Guest executes privileged instruction (e.g. write to CR3)
+        │
+        ▼
+   VM EXIT: hardware saves guest state to VMCS
+        │
+        ▼
+   Hypervisor runs in VMX root mode
+   Handles the privileged operation (emulates or delegates)
+        │
+        ▼
+   VMRESUME: restore guest state from VMCS, return to guest
+
+VMCS (VM Control Structure): per-VM data structure storing
+  guest state, host state, execution controls, exit info.` },
       ]},
-      { heading: "Memory & I/O Virtualization", color: "amber", icon: "🗺️", items: [
-        "Guest thinks it has physical memory 0..N. Hypervisor maps guest-physical → host-physical.",
-        "Two page table levels: guest VA→guest PA (guest PT) + guest PA→host PA (EPT/NPT).",
-        "EPT (Intel Extended Page Tables) / NPT (AMD Nested Page Tables): hardware handles both levels.",
-        "Shadow page tables (pre-EPT): hypervisor manually maintains VA→host-PA. Expensive.",
-        "I/O: emulated devices (slow), virtio paravirtual drivers (fast), passthrough/SR-IOV (near-native).",
-        "SR-IOV: physical NIC presents multiple virtual functions. Each VM gets dedicated VF.",
-        "Snapshots: save VM state (memory+disk). Instant rollback. Not a substitute for backup.",
-        "Live migration: transfer running VM between physical hosts. Near-zero downtime.",
-      ]},
-      { heading: "Exam Traps", color: "red", icon: "⚠️", items: [
-        "KVM = type 1. Linux kernel acts as hypervisor. NOT type 2 even though it requires Linux.",
-        "VirtualBox/VMware Workstation = type 2. VMware ESXi = type 1.",
-        "Full virtualization: guest NOT modified. Paravirtualization: guest IS modified.",
-        "VM exit is expensive. Minimize exits for performance (batch I/O, avoid frequent privileged ops).",
-        "EPT/NPT: hardware walks TWO levels of page tables. TLB miss more expensive in VM than native.",
-        "Snapshot ≠ backup. Deleting the base disk breaks all snapshots on top of it.",
+      { heading: "Memory & I/O Virtualization", icon: "🗺️", color: "amber", blocks: [
+        { t: "p", c: "The key challenge: guest OS thinks it has physical memory starting at 0. But the hypervisor also uses physical memory. Solution: two levels of address translation." },
+        { t: "dia", label: "Two-level page table translation:", c:
+`Guest virtual → guest physical  (guest's own page tables)
+Guest physical → host physical  (EPT/NPT hardware support)
+
+Without EPT/NPT (shadow page tables, pre-2006):
+  Hypervisor manually maintains guest-VA → host-PA mapping
+  Every guest page table modification → VM exit → expensive
+
+With EPT (Intel) / NPT (AMD):
+  Hardware walks BOTH levels automatically
+  Much fewer VM exits for memory operations` },
+        { t: "warn", items: [
+          "KVM = TYPE 1. Linux kernel acts as hypervisor. NOT type 2 even though Linux is the host.",
+          "VirtualBox/VMware Workstation = type 2. VMware ESXi = type 1.",
+          "Full virtualization: guest NOT modified. Paravirtualization: guest IS modified.",
+          "VM exit is expensive: hundreds to thousands of cycles each. Minimize privileged ops.",
+          "EPT/NPT: TLB miss is more expensive in VM than native (two table levels to walk).",
+          "Snapshot ≠ backup. Deleting base disk breaks all snapshots dependent on it.",
+        ]},
       ]},
     ],
   },
 ];
 
-function scrollToTop() {
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-
 export default function StudyPage() {
   const navigate = useNavigate();
   const [selected, setSelected] = useState(0);
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
-
+  const [open, setOpen] = useState<Record<string, boolean>>({});
   const topic = TOPICS[selected];
 
   function selectTopic(i: number) {
     setSelected(i);
-    setOpenSections({});
-    scrollToTop();
+    setOpen({});
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function toggleSection(key: string) {
-    setOpenSections(prev => {
-      const current = prev[key] ?? true;
-      return { ...prev, [key]: !current };
-    });
+  function toggle(key: string) {
+    setOpen(p => ({ ...p, [key]: !(p[key] ?? true) }));
   }
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
-      <header className="border-b border-slate-800 px-4 sm:px-6 py-3 flex items-center gap-3 sticky top-0 bg-slate-950 z-10">
+      <header className="border-b border-slate-800 px-4 sm:px-6 py-3 flex items-center gap-3 sticky top-0 bg-slate-950/95 backdrop-blur z-20">
         <button onClick={() => navigate("/")} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors flex-shrink-0">
           <ArrowLeft className="w-4 h-4" />
         </button>
@@ -1016,19 +1775,14 @@ export default function StudyPage() {
         <span className="text-slate-500 text-xs hidden sm:inline">23 Topics · Spring 2026</span>
       </header>
 
-      <div className="border-b border-slate-800 bg-slate-900/40 sticky top-[53px] z-10">
+      <div className="border-b border-slate-800 bg-slate-900/60 sticky top-[53px] z-10">
         <div className="overflow-x-auto">
           <div className="flex px-4 py-2 gap-1.5 min-w-max">
             {TOPICS.map((t, i) => (
-              <button
-                key={i}
-                onClick={() => selectTopic(i)}
+              <button key={i} onClick={() => selectTopic(i)}
                 className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
-                  selected === i
-                    ? "bg-indigo-600 text-white"
-                    : "text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-                }`}
-              >
+                  selected === i ? "bg-indigo-600 text-white" : "text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                }`}>
                 {t.number}. {t.short}
               </button>
             ))}
@@ -1037,50 +1791,38 @@ export default function StudyPage() {
       </div>
 
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
-        <div className="mb-5">
+        <div className="mb-6">
           <div className="flex items-center justify-between mb-3 gap-3">
             <span className="text-xs font-semibold bg-indigo-500/15 text-indigo-400 border border-indigo-500/25 px-2.5 py-1 rounded-full flex-shrink-0">
               Topic {topic.number} / 23
             </span>
-            <div className="flex items-center gap-3 ml-auto">
-              {selected > 0 && (
-                <button onClick={() => selectTopic(selected - 1)} className="text-xs text-slate-500 hover:text-slate-300 transition-colors">← Prev</button>
-              )}
-              {selected < TOPICS.length - 1 && (
-                <button onClick={() => selectTopic(selected + 1)} className="text-xs text-slate-500 hover:text-slate-300 transition-colors">Next →</button>
-              )}
+            <div className="flex items-center gap-4 ml-auto">
+              {selected > 0 && <button onClick={() => selectTopic(selected - 1)} className="text-xs text-slate-500 hover:text-slate-300 transition-colors">← Prev</button>}
+              {selected < TOPICS.length - 1 && <button onClick={() => selectTopic(selected + 1)} className="text-xs text-slate-500 hover:text-slate-300 transition-colors">Next →</button>}
             </div>
           </div>
           <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">{topic.title}</h1>
           <p className="text-slate-400 text-sm leading-relaxed">{topic.overview}</p>
         </div>
 
-        <div className="space-y-2.5">
+        <div className="space-y-3">
           {topic.sections.map((sec, si) => {
             const key = `${selected}-${si}`;
-            const isOpen = openSections[key] ?? true;
-            const c = COLORS[sec.color] ?? COLORS.indigo;
+            const isOpen = open[key] ?? true;
+            const col = C[sec.color as keyof typeof C] ?? C.indigo;
             return (
-              <div key={si} className={`border rounded-xl overflow-hidden ${c.section}`}>
-                <button
-                  onClick={() => toggleSection(key)}
-                  className="w-full flex items-center justify-between px-4 py-3 text-left"
-                >
+              <div key={si} className={`border rounded-xl overflow-hidden ${col.card}`}>
+                <button onClick={() => toggle(key)} className="w-full flex items-center justify-between px-4 py-3 text-left">
                   <div className="flex items-center gap-2.5">
                     <span className="text-base leading-none">{sec.icon}</span>
-                    <span className={`font-semibold text-sm ${c.badge}`}>{sec.heading}</span>
+                    <span className={`font-semibold text-sm ${col.badge}`}>{sec.heading}</span>
                   </div>
-                  <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform duration-200 ${c.chevron} ${isOpen ? "rotate-180" : ""}`} />
+                  <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform duration-200 ${col.ch} ${isOpen ? "rotate-180" : ""}`} />
                 </button>
                 {isOpen && (
-                  <ul className="px-4 pb-4 space-y-2">
-                    {sec.items.map((item, ii) => (
-                      <li key={ii} className="flex items-start gap-2.5">
-                        <span className={`flex-shrink-0 w-1.5 h-1.5 rounded-full mt-[7px] ${c.dot}`} />
-                        <span className="text-slate-300 text-sm leading-relaxed">{item}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="px-4 pb-4">
+                    {sec.blocks.map((b, bi) => <Block key={bi} b={b} dot={col.dot} />)}
+                  </div>
                 )}
               </div>
             );
@@ -1088,17 +1830,13 @@ export default function StudyPage() {
         </div>
 
         <div className="mt-8 pt-6 border-t border-slate-800 flex flex-col sm:flex-row gap-3">
-          <button
-            onClick={() => navigate("/exam")}
-            className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl transition-all text-sm"
-          >
+          <button onClick={() => navigate("/exam")}
+            className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl transition-all text-sm">
             <Star className="w-4 h-4" /> Test Yourself
           </button>
           {selected < TOPICS.length - 1 && (
-            <button
-              onClick={() => selectTopic(selected + 1)}
-              className="flex-1 flex items-center justify-center gap-2 border border-slate-700 text-slate-300 hover:bg-slate-800 py-2.5 rounded-xl transition-all text-sm"
-            >
+            <button onClick={() => selectTopic(selected + 1)}
+              className="flex-1 flex items-center justify-center gap-2 border border-slate-700 text-slate-300 hover:bg-slate-800 py-2.5 rounded-xl transition-all text-sm">
               Next Topic <ChevronRight className="w-4 h-4" />
             </button>
           )}
