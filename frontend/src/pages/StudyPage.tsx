@@ -419,29 +419,51 @@ jnz  is_odd` },
   {
     number: 5, short: "Assembly & Arithmetic",
     title: "Topic 5 – Assembly Language & Arithmetic Operations",
-    overview: "NASM uses Intel syntax: opcode dst, src (destination first). Each arithmetic instruction sets RFLAGS as a side effect. MUL/IMUL produce double-width results in RDX:RAX. Division requires explicit setup.",
+    overview: "NASM uses Intel syntax: opcode dst, src (destination first). Each arithmetic instruction sets RFLAGS as a side effect. MUL/IMUL produce double-width results in RDX:RAX. Division requires explicit setup. Course target: Windows x64 — Microsoft x64 ABI (RCX, RDX, R8, R9 + 32-byte shadow space).",
     sections: [
-      { heading: "NASM Syntax & Structure", icon: "📝", color: "indigo", blocks: [
-        { t: "code", label: "Minimal NASM program (Linux):", c:
-`section .data
-    msg db "Hello", 10     ; string + newline
-    len equ $ - msg        ; length constant
+      { heading: "NASM Syntax & Structure (Windows x64)", icon: "📝", color: "indigo", blocks: [
+        { t: "code", label: "Minimal Windows x64 NASM program (calls WinAPI):", c:
+`; Build: nasm -f win64 hello.asm -o hello.obj
+;        golink /entry:main /console hello.obj kernel32.dll
+default rel                          ; RIP-relative addressing (required on x64)
+bits 64
+
+extern GetStdHandle
+extern WriteFile
+extern ExitProcess
+
+section .data
+    msg     db  "Hello", 13, 10       ; CRLF (Windows line ending)
+    msg_len equ $ - msg
 
 section .bss
-    buf resb 64            ; reserve 64 uninitialized bytes
+    written resq 1                    ; LPDWORD out-param
 
 section .text
-    global _start
-_start:
-    mov  rax, 1            ; syscall: write
-    mov  rdi, 1            ; fd: stdout
-    mov  rsi, msg          ; buffer address
-    mov  rdx, len          ; length
-    syscall
-    mov  rax, 60           ; syscall: exit
-    xor  rdi, rdi          ; exit code 0
-    syscall` },
-        { t: "p", c: "Intel syntax: destination always on the left. No % prefix on registers. No size suffix on mnemonics. Square brackets mean 'memory at this address': MOV rax,[rbx] reads 8 bytes from the address in rbx." },
+global main
+main:
+    sub  rsp, 40                      ; 32B shadow space + 8B align (rsp % 16 == 0)
+    mov  rcx, -11                     ; STD_OUTPUT_HANDLE
+    call GetStdHandle                 ; rax = handle
+    mov  rcx, rax                     ; arg1: hFile
+    lea  rdx, [msg]                   ; arg2: lpBuffer
+    mov  r8d, msg_len                 ; arg3: nNumberOfBytesToWrite
+    lea  r9, [written]                ; arg4: lpNumberOfBytesWritten
+    mov  qword [rsp+32], 0            ; arg5: lpOverlapped (stack, slot after shadow)
+    call WriteFile
+    xor  ecx, ecx                     ; exit code 0
+    call ExitProcess` },
+        { t: "p", c: "Windows x64 calling convention (Microsoft ABI): first 4 integer args in RCX, RDX, R8, R9. Args 5+ on stack. Caller MUST reserve 32 bytes of shadow space above args before any call. Stack must be 16-byte aligned at the call site (so rsp ends in 0x...0 right before CALL — CALL pushes 8B return addr, prologue makes it aligned again)." },
+        { t: "table", h: ["Element", "Linux x64 (System V)", "Windows x64 (MS ABI)"], r: [
+          ["Int arg regs", "RDI, RSI, RDX, RCX, R8, R9", "RCX, RDX, R8, R9 (only 4)"],
+          ["Shadow space", "none", "32 bytes (caller reserves)"],
+          ["Entry symbol", "_start (or main via libc)", "main (with golink) or WinMain"],
+          ["Syscall", "syscall instruction, num in RAX", "call WinAPI (kernel32.dll, etc.)"],
+          ["Line ending", "LF (10)", "CRLF (13, 10)"],
+          ["Format flag", "nasm -f elf64", "nasm -f win64"],
+          ["Linker", "ld / gcc", "golink, link.exe"],
+        ]},
+        { t: "p", c: "Intel syntax: destination always on the left. No % prefix on registers. No size suffix on mnemonics. Square brackets mean 'memory at this address': MOV rax,[rbx] reads 8 bytes from the address in rbx. On Windows x64 use `default rel` so [label] becomes RIP-relative — required because the loader can map the image anywhere." },
       ]},
       { heading: "Arithmetic Instructions", icon: "➕", color: "violet", blocks: [
         { t: "table", h: ["Instruction", "Effect", "Flags set"], r: [
@@ -1585,73 +1607,157 @@ Bit   0:    Present (P): 0=page fault on access, 1=in RAM` },
 
   // ─────────────────────────────────────────────────────────── TOPIC 21
   {
-    number: 21, short: "Concurrent Programming",
-    title: "Topic 21 – Concurrent Programming",
-    overview: "Concurrent programs have multiple execution flows active at overlapping times. Three approaches: processes (isolated), threads (shared memory), I/O multiplexing (single thread, event loop). Thread safety and reentrancy are distinct properties.",
+    number: 21, short: "Concurrent Programming (Python)",
+    title: "Topic 21 – Concurrent Programming in Python",
+    overview: "Concurrent programs have multiple execution flows active at overlapping times. Python offers three models: threading (shared memory, limited by GIL), multiprocessing (true parallelism, separate memory), asyncio (single-thread event loop, cooperative). The Global Interpreter Lock (GIL) is the central trap — only one thread runs Python bytecode at a time.",
     sections: [
-      { heading: "Concurrency Models", icon: "🔀", color: "indigo", blocks: [
-        { t: "dia", label: "Three approaches:", c:
-`1. Process-based:
-   fork() per client. Strong isolation. IPC = pipes/sockets (overhead).
-   Good when: isolation critical, existing programs, OS does scheduling.
+      { heading: "Concurrency Models in Python", icon: "🔀", color: "indigo", blocks: [
+        { t: "dia", label: "Three approaches — pick by workload:", c:
+`1. threading (threads, shared memory):
+   - I/O-bound work (network, disk, sleep) ✓
+   - CPU-bound work ✗   ← GIL blocks real parallelism
+   - Need locks for shared state.
 
-2. Thread-based:
-   pthread_create() per client. Shared memory, easy IPC.
-   Need synchronization. Good for CPU-bound parallel work.
+2. multiprocessing (separate processes, separate memory):
+   - CPU-bound work ✓   ← bypasses the GIL
+   - IPC via Queue, Pipe, shared_memory, Manager.
+   - Higher startup cost. Each worker is a full Python process.
 
-3. I/O multiplexing (event-driven):
-   Single process, event loop with epoll()/select().
-   No synchronization needed. Complex control flow.
-   Good for: I/O-bound servers with many connections (nginx model).
+3. asyncio (event loop, single thread):
+   - I/O-bound + many connections (10k+) ✓
+   - Cooperative: tasks must "await" — no preemption.
+   - No locks needed for ordinary code (only one task runs at a time).
 
 Concurrency ≠ Parallelism:
-  Concurrent: multiple flows, may INTERLEAVE on 1 core
-  Parallel:   multiple flows execute SIMULTANEOUSLY (need multiple cores)` },
-      ]},
-      { heading: "Pthreads & Shared State", icon: "🧵", color: "violet", blocks: [
-        { t: "code", label: "Basic thread lifecycle:", c:
-`#include <pthread.h>
+  Concurrent: many flows in progress, may INTERLEAVE on 1 core
+  Parallel:   flows execute SIMULTANEOUSLY on multiple cores
 
-void *worker(void *arg) {
-    int id = *(int *)arg;
-    printf("Thread %d working\n", id);
-    return (void *)(intptr_t)(id * 2);   // return value
-}
-
-int main() {
-    pthread_t tid;
-    int arg = 42;
-    pthread_create(&tid, NULL, worker, &arg);
-    // ... do other work ...
-    void *retval;
-    pthread_join(tid, &retval);   // wait + get return value
-    printf("returned: %ld\n", (intptr_t)retval);
-}` },
-        { t: "table", h: ["Function", "Purpose"], r: [
-          ["pthread_create(&tid, attr, fn, arg)", "Spawn thread"],
-          ["pthread_join(tid, &ret)", "Wait for thread, get return value"],
-          ["pthread_detach(tid)", "Auto-cleanup on exit (no join needed)"],
-          ["pthread_exit(ret)", "Exit current thread"],
-          ["pthread_self()", "Get own thread ID"],
-          ["pthread_cancel(tid)", "Request cancellation"],
-        ]},
-      ]},
-      { heading: "Thread Safety & Reentrancy", icon: "✅", color: "amber", blocks: [
-        { t: "p", c: "Thread-safe: a function produces correct results when called concurrently from multiple threads. Reentrant: a stronger guarantee — safe even if interrupted mid-execution and called again (no shared state at all, uses only local variables). Reentrant implies thread-safe, but not vice versa." },
-        { t: "table", h: ["Function", "Thread-safe?", "Reentrant?", "Fix"], r: [
-          ["rand()", "NO", "NO", "rand_r(seed) or thread-local seed"],
-          ["strtok()", "NO", "NO", "strtok_r(str, delim, &saveptr)"],
-          ["localtime()", "NO", "NO", "localtime_r(timer, result)"],
-          ["malloc()/free()", "YES (glibc)", "NO", "uses internal lock"],
-          ["printf()", "YES (glibc)", "NO", "uses FILE lock"],
-          ["memcpy()", "YES", "YES", "pure local ops"],
-          ["strlen()", "YES", "YES", "read-only, no shared state"],
-        ]},
+Python rule of thumb:
+  I/O-bound  → asyncio (best) or threading
+  CPU-bound  → multiprocessing or concurrent.futures.ProcessPoolExecutor` },
         { t: "warn", items: [
-          "Concurrent ≠ parallel. Single core can be concurrent (interleaved), not parallel.",
-          "Reentrant ⊂ thread-safe. Adding a mutex makes something thread-safe but NOT reentrant.",
-          "pthread_join is required unless thread is detached. Otherwise zombie threads accumulate.",
-          "select() FD_SETSIZE = 1024 limit. epoll has no limit. Use epoll for high concurrency.",
+          "GIL: in CPython, only one thread executes Python bytecode at a time. Threads do NOT speed up CPU-bound pure-Python code.",
+          "GIL is released during blocking I/O (read/write, socket, sleep) and inside many C extensions (numpy, hashlib) — that is why threading still helps for I/O.",
+          "PyPy, Jython, IronPython have no GIL. Python 3.13+ has experimental free-threaded build (--disable-gil).",
+        ]},
+      ]},
+      { heading: "threading Module", icon: "🧵", color: "violet", blocks: [
+        { t: "code", label: "Basic thread lifecycle:", c:
+`import threading, time
+
+def worker(name, n):
+    for i in range(n):
+        print(f"{name}: {i}")
+        time.sleep(0.1)
+    return name  # return value not directly captured by Thread
+
+t = threading.Thread(target=worker, args=("A", 3), daemon=False)
+t.start()                # spawn
+t.join(timeout=5.0)      # wait (optional timeout)
+print("alive?", t.is_alive())` },
+        { t: "code", label: "Many threads + capturing results via concurrent.futures:", c:
+`from concurrent.futures import ThreadPoolExecutor
+
+def fetch(url):
+    # I/O-bound — threads help here (GIL releases on socket I/O)
+    import urllib.request
+    return urllib.request.urlopen(url).read()
+
+urls = ["https://a.com", "https://b.com", "https://c.com"]
+with ThreadPoolExecutor(max_workers=8) as pool:
+    for url, data in zip(urls, pool.map(fetch, urls)):
+        print(url, len(data))` },
+        { t: "table", h: ["API", "Purpose"], r: [
+          ["threading.Thread(target, args)", "Create a thread"],
+          [".start()", "Run target() in new thread"],
+          [".join(timeout)", "Wait for thread to finish"],
+          [".is_alive()", "Check if still running"],
+          ["daemon=True", "Dies with the main thread (no join needed)"],
+          ["threading.current_thread()", "Get current Thread object"],
+          ["threading.local()", "Per-thread storage (no sharing)"],
+          ["concurrent.futures.ThreadPoolExecutor", "High-level pool, returns Futures"],
+        ]},
+      ]},
+      { heading: "multiprocessing — Real Parallelism", icon: "⚙️", color: "emerald", blocks: [
+        { t: "code", label: "CPU-bound work via process pool:", c:
+`from concurrent.futures import ProcessPoolExecutor
+import math
+
+def heavy(n):
+    return sum(math.sqrt(i) for i in range(n))
+
+if __name__ == "__main__":          # REQUIRED on Windows (spawn)
+    with ProcessPoolExecutor(max_workers=4) as pool:
+        results = list(pool.map(heavy, [10_000_000]*4))
+    print(results)` },
+        { t: "code", label: "IPC with Queue:", c:
+`from multiprocessing import Process, Queue
+
+def producer(q):
+    for i in range(5):
+        q.put(i)
+    q.put(None)            # sentinel
+
+def consumer(q):
+    while True:
+        item = q.get()
+        if item is None: break
+        print("got", item)
+
+if __name__ == "__main__":
+    q = Queue()
+    p1 = Process(target=producer, args=(q,))
+    p2 = Process(target=consumer, args=(q,))
+    p1.start(); p2.start()
+    p1.join();  p2.join()` },
+        { t: "warn", items: [
+          "Windows uses 'spawn' (not fork) — child re-imports the script. Always guard with `if __name__ == '__main__':`.",
+          "Args/return values must be picklable (no lambdas, no local functions, no open file handles).",
+          "Each process has its OWN memory. Globals are NOT shared. Use Queue/Pipe/Manager/shared_memory.",
+        ]},
+      ]},
+      { heading: "asyncio — Cooperative Concurrency", icon: "⏳", color: "amber", blocks: [
+        { t: "code", label: "async/await basics:", c:
+`import asyncio
+
+async def fetch(name, delay):
+    print(f"{name} start")
+    await asyncio.sleep(delay)         # yields control during wait
+    print(f"{name} done")
+    return name
+
+async def main():
+    # Run concurrently — total time ≈ max(2,1,3) = 3s, not 6s
+    results = await asyncio.gather(
+        fetch("A", 2),
+        fetch("B", 1),
+        fetch("C", 3),
+    )
+    print(results)
+
+asyncio.run(main())` },
+        { t: "p", c: "asyncio is single-threaded. A task only switches at an `await`. If you call a blocking function (time.sleep, requests.get, heavy CPU loop) the WHOLE event loop stalls — use `asyncio.to_thread(fn, *args)` or an executor for blocking calls." },
+      ]},
+      { heading: "Thread Safety", icon: "✅", color: "rose", blocks: [
+        { t: "p", c: "Thread-safe = correct results when called from multiple threads concurrently. CPython's GIL makes individual bytecodes atomic, but compound operations (x += 1, list.append + list.pop, check-then-act) are NOT atomic — multiple bytecodes, GIL can switch between them." },
+        { t: "code", label: "Race condition demo:", c:
+`import threading
+counter = 0
+
+def bump():
+    global counter
+    for _ in range(100_000):
+        counter += 1            # NOT atomic: LOAD, ADD, STORE
+
+ts = [threading.Thread(target=bump) for _ in range(8)]
+for t in ts: t.start()
+for t in ts: t.join()
+print(counter)                 # ≠ 800000 — lost updates` },
+        { t: "warn", items: [
+          "Concurrent ≠ parallel. Threading gives concurrency on 1 core; multiprocessing gives true parallelism.",
+          "GIL does NOT make your code thread-safe. `x += 1` still races.",
+          "queue.Queue and collections.deque.append/popleft are individually thread-safe — prefer them over manual locking when possible.",
+          "Daemon threads are killed without cleanup when the main thread exits — do not use for important writes/IO.",
         ]},
       ]},
     ],
@@ -1659,64 +1765,112 @@ int main() {
 
   // ─────────────────────────────────────────────────────────── TOPIC 22
   {
-    number: 22, short: "Parallelism & Sync",
-    title: "Topic 22 – Parallelism & Synchronization",
-    overview: "Synchronization primitives protect shared data. Mutex = binary lock. Semaphore = counting lock. Condition variable = wait for condition (ALWAYS use while, not if). Amdahl's Law: the serial fraction of code hard-limits the maximum achievable speedup.",
+    number: 22, short: "Parallelism & Sync (Python)",
+    title: "Topic 22 – Parallelism & Synchronization in Python",
+    overview: "Synchronization primitives protect shared data between threads. Python (threading module) provides Lock, RLock, Semaphore, Condition, Event, Barrier. Always use the `with` statement — exception-safe release. Amdahl's Law caps speedup based on the serial fraction.",
     sections: [
-      { heading: "Mutex, Semaphore & Spinlock", icon: "🔒", color: "indigo", blocks: [
-        { t: "code", label: "Mutex usage pattern:", c:
-`pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
-int shared_counter = 0;
+      { heading: "Lock, RLock, Semaphore", icon: "🔒", color: "indigo", blocks: [
+        { t: "code", label: "Lock — fix the racing counter:", c:
+`import threading
 
-void increment() {
-    pthread_mutex_lock(&lock);   // blocks if locked
-    shared_counter++;            // critical section
-    pthread_mutex_unlock(&lock); // releases
-}
+lock = threading.Lock()
+counter = 0
 
-// Trylock (non-blocking attempt):
-if (pthread_mutex_trylock(&lock) == 0) {
-    // got it
-    pthread_mutex_unlock(&lock);
-} else {
-    // EBUSY: already locked, do something else
-}` },
-        { t: "table", h: ["Primitive", "Function", "Behavior"], r: [
-          ["Mutex", "pthread_mutex_lock/unlock", "Binary: 0 or 1. Blocks on lock."],
-          ["Semaphore", "sem_wait / sem_post", "Counter. Blocks when 0."],
-          ["Spinlock", "pthread_spin_lock/unlock", "Busy-waits. Good for short sections."],
-          ["RW Lock", "pthread_rwlock_rdlock / wrlock", "Multiple readers OR one writer"],
+def bump():
+    global counter
+    for _ in range(100_000):
+        with lock:               # acquire on enter, release on exit (even on exception)
+            counter += 1
+
+ts = [threading.Thread(target=bump) for _ in range(8)]
+for t in ts: t.start()
+for t in ts: t.join()
+print(counter)                  # 800000 ✓` },
+        { t: "code", label: "Try-acquire (non-blocking):", c:
+`if lock.acquire(blocking=False):
+    try:
+        # got the lock
+        ...
+    finally:
+        lock.release()
+else:
+    # already held — do something else` },
+        { t: "table", h: ["Primitive", "Class", "Behavior"], r: [
+          ["Lock (mutex)", "threading.Lock()", "Binary. acquire() blocks if held."],
+          ["Reentrant lock", "threading.RLock()", "Same thread may acquire multiple times."],
+          ["Semaphore", "threading.Semaphore(n)", "Counter. Blocks when count == 0."],
+          ["BoundedSemaphore", "threading.BoundedSemaphore(n)", "Same, errors on over-release."],
+          ["Event", "threading.Event()", "set()/wait()/clear() — one-shot flag."],
+          ["Barrier", "threading.Barrier(n)", "All n threads wait at .wait() then proceed."],
+        ]},
+        { t: "warn", items: [
+          "Always use `with lock:` — guarantees release even on exception. Manual acquire/release leaks locks on errors.",
+          "Lock is NOT reentrant. The same thread calling acquire() twice deadlocks itself. Use RLock if you need recursion.",
+          "Acquiring a Python Lock releases the GIL while waiting — other threads run.",
         ]},
       ]},
       { heading: "Condition Variables", icon: "⏳", color: "violet", blocks: [
-        { t: "p", c: "Condition variables solve the 'wait until X is true' problem. CRITICAL: always use a while loop, never if. Spurious wakeups (the OS waking a thread without pthread_cond_signal) are allowed by POSIX. Always re-check the condition after waking." },
-        { t: "code", label: "Producer-consumer with condition variable:", c:
-`pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t  nonempty = PTHREAD_COND_INITIALIZER;
-pthread_cond_t  nonfull  = PTHREAD_COND_INITIALIZER;
-int buf[N], head=0, tail=0, count=0;
+        { t: "p", c: "Condition variables solve 'wait until X is true'. ALWAYS use a `while` loop around wait(), never `if` — spurious wakeups are allowed. wait() atomically releases the lock and sleeps; on wakeup it re-acquires before returning." },
+        { t: "code", label: "Producer-consumer with Condition:", c:
+`import threading
+from collections import deque
 
-void produce(int item) {
-    pthread_mutex_lock(&lock);
-    while (count == N)                          // WHILE not if!
-        pthread_cond_wait(&nonfull, &lock);     // atomically release + sleep
-    buf[tail++ % N] = item;  count++;
-    pthread_cond_signal(&nonempty);
-    pthread_mutex_unlock(&lock);
-}
+cv  = threading.Condition()      # internal Lock + wait queue
+buf = deque()
+N   = 10
 
-void *consume() {
-    pthread_mutex_lock(&lock);
-    while (count == 0)                          // WHILE not if!
-        pthread_cond_wait(&nonempty, &lock);
-    int item = buf[head++ % N];  count--;
-    pthread_cond_signal(&nonfull);
-    pthread_mutex_unlock(&lock);
-    return item;
-}` },
+def producer(item):
+    with cv:
+        while len(buf) == N:                # WHILE, not if
+            cv.wait()                       # release lock + sleep
+        buf.append(item)
+        cv.notify_all()                     # wake consumers
+
+def consumer():
+    with cv:
+        while not buf:                      # WHILE, not if
+            cv.wait()
+        item = buf.popleft()
+        cv.notify_all()                     # wake producers (buf has space)
+        return item` },
+        { t: "code", label: "Cleaner version with queue.Queue (recommended):", c:
+`import queue, threading
+
+q = queue.Queue(maxsize=10)        # bounded, blocks producer when full
+
+def producer():
+    for i in range(100):
+        q.put(i)                    # blocks if full
+    q.put(None)                     # poison pill
+
+def consumer():
+    while True:
+        item = q.get()              # blocks if empty
+        if item is None:
+            q.task_done()
+            break
+        print("consumed", item)
+        q.task_done()
+
+# queue.Queue handles all locking + condition variables internally.` },
       ]},
       { heading: "Deadlock & Amdahl's Law", icon: "📊", color: "amber", blocks: [
-        { t: "p", c: "Deadlock requires all 4 conditions simultaneously: mutual exclusion, hold-and-wait, no preemption, circular wait. Break ANY one to prevent deadlock. The easiest: enforce a global lock ordering (never acquire lock B while holding lock A if anywhere you also acquire A while holding B)." },
+        { t: "code", label: "Deadlock — circular lock acquisition:", c:
+`import threading, time
+a, b = threading.Lock(), threading.Lock()
+
+def t1():
+    with a:
+        time.sleep(0.1)
+        with b:                # waits for b — held by t2
+            ...
+
+def t2():
+    with b:
+        time.sleep(0.1)
+        with a:                # waits for a — held by t1  → DEADLOCK
+            ...` },
+        { t: "p", c: "Deadlock needs all 4 Coffman conditions at once: mutual exclusion, hold-and-wait, no preemption, circular wait. Break any one to prevent it. Easiest: enforce a global lock order (always acquire `a` before `b` everywhere)." },
         { t: "dia", label: "Amdahl's Law — speedup vs cores:", c:
 `Speedup S(N) = 1 / (f + (1-f)/N)
 f = serial fraction, N = number of processors
@@ -1726,14 +1880,14 @@ f=0.5 (50%)  1×    1.33×  1.60×  1.78×  1.88×   2×  ← hard wall
 f=0.1 (10%)  1×    1.82×  3.08×  4.71×  6.40×  10×
 f=0.01 (1%)  1×    1.98×  3.88×  7.41× 13.91× 100×
 
-→ Even 1% serial code limits you to 100× max, regardless of cores.
-→ The serial fraction dominates at high core counts.` },
+→ Even 1% serial code caps speedup at 100× — regardless of core count.
+→ Serial fraction dominates at high N.` },
         { t: "warn", items: [
-          "ALWAYS use while() not if() with pthread_cond_wait. Spurious wakeups are real.",
-          "pthread_cond_wait must be called with mutex LOCKED. Releases atomically during sleep.",
-          "Amdahl example — 8 cores, 20% serial: S = 1/(0.2 + 0.8/8) = 1/0.3 = 3.33×",
-          "False sharing: two threads write different vars in same 64B cache line → cache ping-pong.",
-          "sem_post() is async-signal-safe. pthread_mutex_unlock() is NOT (unsafe in signal handlers).",
+          "ALWAYS use `while` not `if` with cv.wait(). Spurious wakeups are real.",
+          "cv.wait() must be called while holding the Condition's lock (use `with cv:`).",
+          "Amdahl example — 8 cores, 20% serial: S = 1/(0.2 + 0.8/8) = 1/0.3 = 3.33×.",
+          "Threading speedup capped by GIL on CPU-bound code — Amdahl's `f` is effectively 100% in pure Python.",
+          "Prefer queue.Queue over hand-rolled Condition/Lock — fewer bugs, same primitive underneath.",
         ]},
       ]},
     ],
