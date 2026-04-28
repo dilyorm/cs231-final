@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { BookOpen, Shield, ChevronRight, Cpu, Settings, Mic, MicOff, Volume2, LogIn, History, GraduationCap, Sun, Moon, PlayCircle } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "../contexts/ThemeContext";
+import { track } from "../lib/analytics";
 
 export default function Home() {
   const [verbalMode, setVerbalMode] = useState(false);
@@ -12,6 +13,7 @@ export default function Home() {
 
   function startExam() {
     sessionStorage.setItem("verbalMode", verbalMode ? "1" : "0");
+    track("exam_start", { verbal_mode: verbalMode });
     navigate("/exam");
   }
 

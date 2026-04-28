@@ -9,6 +9,7 @@ import type { ExamSession, FullEvaluation } from "../types";
 import { api } from "../lib/api";
 import { useTTS, useSTT } from "../hooks/useSpeech";
 import { useCountdown } from "../hooks/useCountdown";
+import { track } from "../lib/analytics";
 
 const PREP_SECONDS = 20 * 60;
 
@@ -210,12 +211,19 @@ export default function ExamFlow({ session: initialSession, verbalMode, onDone }
     const next = qIdx + 1;
     if (next >= questions.length) {
       // Complete
+      let completedScore: number | undefined;
       try {
         const result = await api.completeSession(session.session_id);
         setFinalResult(result);
+        completedScore = result?.final_score;
       } catch (_) {}
       timer.stop();
       setPhase("complete");
+      track("exam_complete", {
+        score: completedScore,
+        num_questions: questions.length,
+        verbal_mode: verbalMode,
+      });
       return;
     }
     if (next === prepCount) {

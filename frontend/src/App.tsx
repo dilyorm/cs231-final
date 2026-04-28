@@ -13,12 +13,14 @@ import QuestionForm from "./pages/admin/QuestionForm";
 import UsersPage from "./pages/admin/UsersPage";
 import ImportPage from "./pages/admin/ImportPage";
 import StudyPage from "./pages/StudyPage";
+import AnalyticsListener from "./components/AnalyticsListener";
 
 export default function App() {
   return (
     <ThemeProvider>
     <AuthProvider>
       <BrowserRouter>
+        <AnalyticsListener />
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<LoginPage />} />

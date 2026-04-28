@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, BookOpen, ChevronRight, ChevronDown, Star, AlertTriangle, Sun, Moon, FileText, Download, ExternalLink, PlayCircle } from "lucide-react";
 import { useTheme } from "../contexts/ThemeContext";
+import { track } from "../lib/analytics";
 
 type Block =
   | { t: "p"; c: string }
@@ -1989,6 +1990,10 @@ export default function StudyPage() {
     setActiveSlide(null);
     setVideoOpen(false);
     setActiveVideo(null);
+    track("study_topic_view", {
+      topic_number: TOPICS[i].number,
+      topic_title: TOPICS[i].short,
+    });
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -2081,7 +2086,11 @@ export default function StudyPage() {
                       </div>
                       <div className="flex items-center gap-1.5 flex-shrink-0">
                         <button
-                          onClick={() => setActiveSlide(activeSlide === s.file ? null : s.file)}
+                          onClick={() => {
+                            const opening = activeSlide !== s.file;
+                            setActiveSlide(opening ? s.file : null);
+                            if (opening) track("slide_open", { topic_number: topic.number, file: s.file });
+                          }}
                           className="flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 px-2 py-1 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-900/40 transition-colors"
                         >
                           <ExternalLink className="w-3 h-3" />
@@ -2138,7 +2147,11 @@ export default function StudyPage() {
                       <span className="text-sm font-medium text-gray-800 dark:text-slate-200 truncate">{v.title}</span>
                       <div className="flex items-center gap-1.5 flex-shrink-0">
                         <button
-                          onClick={() => setActiveVideo(activeVideo === v.id ? null : v.id)}
+                          onClick={() => {
+                            const playing = activeVideo !== v.id;
+                            setActiveVideo(playing ? v.id : null);
+                            if (playing) track("lecture_video_play", { topic_number: topic.number, video_id: v.id, title: v.title });
+                          }}
                           className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200 px-2 py-1 rounded-md hover:bg-red-50 dark:hover:bg-red-900/40 transition-colors"
                         >
                           <PlayCircle className="w-3 h-3" />

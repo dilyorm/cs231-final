@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import type { User } from "../types";
+import { track, setUser as setAnalyticsUser } from "../lib/analytics";
 
 interface AuthContextValue {
   user: User | null;
@@ -24,6 +25,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(newUser);
     localStorage.setItem("cs231_token", newToken);
     localStorage.setItem("cs231_user", JSON.stringify(newUser));
+    setAnalyticsUser(newUser.id);
+    track("login", { method: "password", role: newUser.role });
   }
 
   function logout() {
@@ -31,7 +34,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     localStorage.removeItem("cs231_token");
     localStorage.removeItem("cs231_user");
+    setAnalyticsUser(null);
+    track("logout");
   }
+
+  useEffect(() => {
+    if (user) setAnalyticsUser(user.id);
+  }, []);
 
   return (
     <AuthContext.Provider
